@@ -2,7 +2,8 @@ use std::collections::BTreeMap;
 
 use serde_json::{Value, json};
 use skyshot::{
-    RenderError, RenderInput, RenderOptions, Renderer, Warning, post_lookup, trusted_media_url,
+    RenderError, RenderInput, RenderOptions, Renderer, Theme, Warning, post_lookup,
+    trusted_media_url,
 };
 
 const POST: &str = include_str!("fixtures/post.json");
@@ -36,6 +37,48 @@ fn malformed_facets_leave_a_renderable_post() {
     let decoded = image::load_from_memory(&output.png).unwrap().to_rgba8();
     assert_eq!(decoded.dimensions(), (1200, output.height));
     assert!(decoded.pixels().any(|p| p.0 == [0x00, 0x6a, 0xff, 0xff]));
+}
+
+#[test]
+fn follow_button_uses_theme_colors_at_both_widths() {
+    let input = RenderInput::from_json(POST).unwrap();
+    let mut renderer = Renderer::new().unwrap();
+    for (theme, fill, text) in [
+        (Theme::Light, [0x23, 0x2e, 0x3e, 0xff], [0xff; 4]),
+        (
+            Theme::Dim,
+            [0xe2, 0xe7, 0xee, 0xff],
+            [0x15, 0x1d, 0x28, 0xff],
+        ),
+        (Theme::Dark, [0xdc, 0xe2, 0xea, 0xff], [0, 0, 0, 0xff]),
+    ] {
+        for width in [390, 600] {
+            let output = renderer
+                .render(
+                    &input,
+                    RenderOptions {
+                        theme,
+                        width,
+                        scale: 1,
+                        ..RenderOptions::default()
+                    },
+                    &BTreeMap::new(),
+                )
+                .unwrap();
+            let png = image::load_from_memory(&output.png).unwrap().to_rgba8();
+            let (fill, text) = if width == 390 {
+                ([0xe2, 0xe7, 0xee, 0xff], [0x15, 0x1d, 0x28, 0xff])
+            } else {
+                (fill, text)
+            };
+            assert_eq!(png.get_pixel(width - 28, 36).0, fill, "{theme:?}, {width}");
+            let button = image::imageops::crop_imm(&png, width - 80, 22, 48, 30);
+            assert!(
+                button.to_image().pixels().any(|pixel| pixel.0 == text),
+                "Follow foreground: {theme:?}, {width}"
+            );
+        }
+    }
 }
 
 #[test]

@@ -26,6 +26,7 @@ struct Colors {
     panel: u32,
     link: u32,
     control: u32,
+    follow: u32,
 }
 impl Colors {
     fn from_theme(theme: Theme) -> Self {
@@ -41,6 +42,11 @@ impl Colors {
             border,
             panel,
             link,
+            follow: match theme {
+                Theme::Light => 0x232e3e,
+                Theme::Dark => 0xdce2ea,
+                Theme::Dim => 0xe2e7ee,
+            },
             control: match theme {
                 Theme::Light | Theme::Dark => 0x667b99,
                 Theme::Dim => 0x6f839f,
@@ -163,7 +169,7 @@ impl Layout<'_> {
         );
         let follow_x = PAD + w - follow_width;
         let (fill, text) = if wide {
-            (0x232e3e, 0xffffff)
+            (self.colors.follow, self.colors.background)
         } else {
             (0xe2e7ee, 0x151d28)
         };
