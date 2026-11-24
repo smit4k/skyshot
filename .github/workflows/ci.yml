@@ -16,6 +16,16 @@ jobs:
       - run: cargo fmt --check
       - run: cargo clippy --locked --all-targets --all-features -- -D warnings
       - run: cargo test --locked
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node scripts/fonts.mjs
+      - run: cargo build --release --locked
+      - run: node scripts/render-corpus.mjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: native-${{ matrix.os }}
+          path: target/parity-native/*.png
 
   wasm:
     runs-on: ubuntu-latest
@@ -31,4 +41,32 @@ jobs:
       - run: cargo build --release --locked
       - run: sh scripts/build-wasm.sh
       - run: node --test tests/wasm.test.mjs
+        env:
+          SKYSHOT_PARITY_DIR: target/parity-wasm
+      - run: npm run test:fonts
       - run: npm run test:site
+      - run: npm run bench
+      - run: SKYSHOT_VERIFY=1 sh scripts/build-wasm.sh
+      - run: npm run test:chrome
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: chrome-report
+          path: target/chrome-report.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wasm
+          path: target/parity-wasm/*.png
+
+  parity:
+    needs: [native, wasm]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/download-artifact@v4
+        with:
+          path: target/parity
+      - run: node scripts/compare-parity.mjs target/parity/native-ubuntu-latest target/parity/native-macos-latest target/parity/wasm

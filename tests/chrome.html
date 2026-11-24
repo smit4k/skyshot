@@ -1,0 +1,154 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Skyshot Chrome layout oracle</title>
+<style>
+  @font-face { font-family: Inter; src: url('/fonts/InterVariable.ttf'); font-weight: 100 900; }
+  #sample, .oracle-card { font-feature-settings: 'calt' 0; font-synthesis-weight: none; }
+  #sample, .body { white-space: pre-wrap; word-break: break-word; }
+  .oracle-card { box-sizing: border-box; padding: 16px; }
+  .header { height: 42px; margin-bottom: 12px; }
+  .body { font-size: 16.9px; line-height: 22px; }
+  .timestamp { margin-top: 12px; font-size: 13.1px; line-height: 17px; }
+  .stats { display: flex; flex-wrap: wrap; column-gap: 16px; row-gap: 4px; margin-top: 12px; border-top: 1px solid; padding: 8px 0 14px; font-size: 15px; line-height: 20px; }
+  .stat { white-space: nowrap; }
+  .stat b { font-weight: 600; margin-right: 4px; }
+  .controls { height: 20px; }
+  .timestamp + .controls { margin-top: 12px; }
+</style>
+<div id="sample" dir="auto"></div>
+<script>globalThis.oracleDone = new Promise((resolve, reject) => { globalThis.done = resolve; globalThis.fail = reject; });</script>
+<script type="module">
+import init, { Renderer } from '/target/chrome/skyshot.js';
+import { fontNames } from '/packages/skyshot/shared.mjs';
+import { loadSkyshot } from '/packages/skyshot/web.mjs';
+import { cases, widths, sizes } from './chrome-cases.mjs';
+
+try {
+  const demo = await (await fetch('./fixtures/post.json')).json();
+  const plain = { ...demo, author: { ...demo.author, avatar: undefined }, record: { ...demo.record, text: 'Hello Bluesky! Read https://bsky.app', facets: [] } };
+  const lazyStart = performance.now();
+  const lazy = await loadSkyshot({ lazy: true });
+  await lazy.prepare(plain);
+  const fallbackRequests = () => performance.getEntriesByType('resource').filter(entry => entry.name.includes('/skyshot/fonts/')).length;
+  if (fallbackRequests() !== 0) throw new Error('ASCII startup downloaded fallback fonts');
+  const lazyLoadMs = performance.now() - lazyStart;
+  const renderTimes = [];
+  for (let i = 0; i < 38; i++) {
+    const start = performance.now();
+    lazy.render(plain, { timeZone: 'UTC' });
+    renderTimes.push(performance.now() - start);
+  }
+  const firstRenderMs = renderTimes[0];
+  const warm = renderTimes.slice(8).sort((a, b) => a - b);
+  const browserPerformance = { lazyLoadMs, firstRenderMs, warmMedianMs: warm[15], fallbackRequests: fallbackRequests() };
+  const families = ['Noto Color Emoji', 'Noto Sans', 'Noto Sans Arabic', 'Noto Sans Devanagari', 'Noto Sans Hebrew', 'Noto Sans JP', 'Noto Sans KR', 'Noto Sans SC', 'Noto Sans Symbols 2', 'Noto Sans Thai'];
+  const ranges = [null, null, 'U+0600-06FF,U+0750-077F,U+08A0-08FF,U+FB50-FDFF,U+FE70-FEFF', 'U+0900-097F', 'U+0590-05FF,U+FB1D-FB4F', 'U+3040-30FF,U+31F0-31FF', 'U+1100-11FF,U+3130-318F,U+AC00-D7AF', 'U+3400-4DBF,U+4E00-9FFF,U+20000-323AF', null, 'U+0E00-0E7F'];
+  await init();
+  const bytes = await Promise.all(fontNames.map(async (name, i) => {
+    const response = await fetch(`/packages/skyshot/fonts/${name}`);
+    if (!response.ok) throw new Error(`Missing font: ${name}`);
+    const data = await response.arrayBuffer();
+    const face = new FontFace(families[i], data, { weight: i === 0 || i === 8 ? '400' : '100 900', ...(ranges[i] ? { unicodeRange: ranges[i] } : {}) });
+    document.fonts.add(await face.load());
+    return new Uint8Array(data);
+  }));
+  await document.fonts.load('16.9px Inter');
+  const renderer = new Renderer(bytes);
+  const sample = document.querySelector('#sample');
+  sample.style.fontFamily = ['Inter', ...families].map(name => `"${name}"`).join(',');
+  const mismatches = [];
+  const widthErrors = [];
+  let layouts = 0;
+  for (const [id, text] of cases.entries()) {
+    sample.textContent = text;
+    const node = sample.firstChild;
+    for (const size of sizes) for (const strong of [false, true]) for (const width of widths) {
+      sample.style.width = `${width}px`;
+      sample.style.fontSize = `${size}px`;
+      sample.style.lineHeight = `${Math.round(size * 1.3)}px`;
+      sample.style.fontWeight = strong ? '600' : '400';
+      const lines = [];
+      const range = document.createRange();
+      let offset = 0;
+      let firstCenter;
+      for (const char of text) {
+        range.setStart(node, offset);
+        range.setEnd(node, offset + char.length);
+        const rect = range.getBoundingClientRect();
+        const center = (rect.top + rect.bottom) / 2;
+        firstCenter ??= center;
+        const key = Math.round((center - firstCenter) / Math.round(size * 1.3));
+        let line = lines.find(line => line.key === key);
+        if (!line) lines.push(line = { key, text: '', left: Infinity, right: -Infinity });
+        line.text += char;
+        if (char.trim()) {
+          line.left = Math.min(line.left, rect.left);
+          line.right = Math.max(line.right, rect.right);
+        }
+        offset += char.length;
+      }
+      const actual = renderer.text_layout(text, width, size, strong);
+      // Range includes hanging spaces and newline ink differently; compare visible line text.
+      const chrome = lines.map(line => line.text.trimEnd());
+      const skyshot = actual.lines.map(line => line.text.trimEnd());
+      const key = `${id}/${size}/${strong ? 600 : 400}/${width}`;
+      if (JSON.stringify(chrome) !== JSON.stringify(skyshot)) mismatches.push({ key, text, chrome, skyshot });
+      else {
+        const delta = Math.max(...lines.map((line, i) => line.text.trim() ? Math.abs(line.right - line.left - actual.lines[i].width) : 0));
+        if (delta > 1) widthErrors.push({ key, delta });
+      }
+      layouts++;
+    }
+  }
+  const cardMismatches = [];
+  let cards = 0;
+  for (const [i, id] of [0, 1, 5, 10, 16, 18, 20, 28].entries()) {
+    const post = { ...plain, record: { ...plain.record, text: cases[id] } };
+    if (i % 2 === 0) for (const key of ['replyCount', 'repostCount', 'quoteCount', 'likeCount', 'bookmarkCount']) delete post[key];
+    for (const width of [280, 390, 600, 1000]) for (const theme of ['light', 'dim', 'dark']) for (const scale of [1, 2]) {
+      const card = document.createElement('article');
+      card.className = 'oracle-card';
+      card.style.width = `${width}px`;
+      card.style.fontFamily = sample.style.fontFamily;
+      const body = document.createElement('div');
+      body.className = 'body';
+      body.dir = 'auto';
+      body.textContent = post.record.text;
+      card.innerHTML = '<div class="header"></div>';
+      card.append(body);
+      const timestamp = document.createElement('div');
+      timestamp.className = 'timestamp';
+      timestamp.textContent = '12:30 PM · Mar 4, 2025';
+      card.append(timestamp);
+      if (i % 2) {
+        const stats = document.createElement('div');
+        stats.className = 'stats';
+        stats.innerHTML = ['123 reposts', '3 quotes', '3.4K likes', '12 saves'].map(value => {
+          const [number, label] = value.split(' ');
+          return `<span class="stat"><b>${number}</b>${label}</span>`;
+        }).join('');
+        card.append(stats);
+      }
+      const controls = document.createElement('div');
+      controls.className = 'controls';
+      card.append(controls);
+      document.body.append(card);
+      const options = { width, scale, theme, timeZone: 'UTC', hour12: true };
+      const layout = renderer.scene_layout(JSON.stringify(post), JSON.stringify(options));
+      const box = card.getBoundingClientRect();
+      const bodyBox = body.getBoundingClientRect();
+      const reference = { width: width * scale, height: Math.ceil(box.height * scale), bodyY: bodyBox.top - box.top, bodyHeight: bodyBox.height };
+      const result = renderer.render(JSON.stringify(post), JSON.stringify(options), new Map());
+      const actualBody = layout.text.find(item => item.y === 70);
+      const actual = { width: result.width, height: result.height, bodyY: actualBody?.y, bodyHeight: actualBody?.block.height };
+      result.free();
+      const key = `${id}/${width}/${theme}/${scale}`;
+      if (JSON.stringify(actual) !== JSON.stringify(reference)) cardMismatches.push({ key, chrome: reference, skyshot: actual });
+      card.remove();
+      cards++;
+    }
+  }
+  renderer.free();
+  globalThis.done({ userAgent: navigator.userAgent, browserPerformance, layouts, mismatches, widthErrors, cards, cardMismatches });
+} catch (error) { globalThis.fail(String(error.stack ?? error)); }
+</script>

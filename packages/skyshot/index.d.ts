@@ -26,11 +26,17 @@ export interface RenderResult {
 }
 
 export interface Skyshot {
+  /** Load required fallback fonts in lazy mode; returns the supplied input. */
+  prepare<T extends PostJson | ResolvedPost>(input: T): Promise<T>;
   resolve(input: string, options?: RenderOptions): Promise<ResolvedPost>;
   render(input: PostJson | ResolvedPost, options?: RenderOptions): RenderResult;
+  /** Render up to eight layouts. Each renderMs includes PNG encoding and excludes batch setup. */
+  renderMany(input: PostJson | ResolvedPost, options: readonly RenderOptions[]): (RenderResult & { renderMs: number })[];
 }
 
 export function loadSkyshot(options?: {
+  /** Defer fallback fonts until resolve() or prepare(). Defaults to false. */
+  lazy?: boolean;
   fonts?: Uint8Array[];
   fetch?: typeof globalThis.fetch;
 }): Promise<Skyshot>;

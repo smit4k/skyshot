@@ -162,6 +162,12 @@ fn resolver_only_builds_public_requests() {
     );
     let request = lookup.thread_url(Some("did:plc:example"), 0).unwrap();
     assert_eq!(request.query_pairs().collect::<Vec<_>>()[2].1, "1");
+    let direct = lookup.thread_url(None, 0).unwrap();
+    assert_eq!(
+        direct.query_pairs().next().unwrap().1,
+        "at://bsky.app/app.bsky.feed.post/3n2ozugncr22j"
+    );
+    assert!(lookup.thread_url(Some("not-a-did.example"), 0).is_err());
     assert!(post_lookup("https://bsky.app@other.example/profile/bsky.app/post/test").is_err());
     assert!(post_lookup("at://did:plc:example/app.bsky.feed.like/test").is_err());
     assert!(trusted_media_url("https://cdn.bsky.app.evil.example/img/avatar/demo").is_none());

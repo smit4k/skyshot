@@ -17,13 +17,20 @@ required-features = ["cli"]
 [features]
 default = ["cli"]
 cli = ["dep:clap", "dep:iana-time-zone", "dep:reqwest"]
-wasm = ["dep:wasm-bindgen", "dep:serde-wasm-bindgen", "dep:js-sys"]
+wasm = ["dep:wasm-bindgen", "dep:serde-wasm-bindgen", "dep:js-sys", "tiny-skia/simd"]
+verify = []
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+strip = "debuginfo"
 
 [dependencies]
 chrono = { version = "0.4", default-features = false, features = ["std"] }
 chrono-tz = { version = "0.10", features = ["serde"] }
 cosmic-text = { version = "0.19", default-features = false, features = ["std", "swash"] }
 image = { version = "0.25", default-features = false, features = ["png", "jpeg", "webp", "gif"] }
+jpeg-decoder = { version = "0.3.2", default-features = false, features = ["platform_independent"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 thiserror = "2"

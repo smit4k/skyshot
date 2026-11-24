@@ -18,16 +18,21 @@ function finish(error) {
 }
 
 function startWorker() {
-  worker = new Worker(new URL('./render-worker.mjs', import.meta.url), { type: 'module' });
-  worker.onmessage = ({ data }) => {
-    if (data.status) {
-      status.textContent = data.status;
+  const instance = new Worker(new URL('./render-worker.mjs', import.meta.url), { type: 'module' });
+  worker = instance;
+  function fail(error) {
+    instance.terminate();
+    worker = undefined;
+    if (button.disabled) finish(error);
+  }
+  instance.onmessage = ({ data }) => {
+    if (worker !== instance) return;
+    if (data.preloadFailed || data.error) {
+      fail(data.error ?? 'Could not start the renderer. Please try again.');
       return;
     }
-    if (data.error) {
-      worker.terminate();
-      worker = undefined;
-      finish(data.error);
+    if (data.status) {
+      status.textContent = data.status;
       return;
     }
     if (imageUrl) URL.revokeObjectURL(imageUrl);
@@ -42,11 +47,9 @@ function startWorker() {
     if (data.warnings.length) status.textContent += ' Some details could not be rendered.';
     finish();
   };
-  worker.onerror = event => {
+  instance.onerror = event => {
     event.preventDefault();
-    worker.terminate();
-    worker = undefined;
-    finish('Could not start the renderer. Please try again.');
+    if (worker === instance) fail('Could not start the renderer. Please try again.');
   };
 }
 
@@ -82,3 +85,9 @@ form.addEventListener('submit', event => {
 themes.addEventListener('change', () => {
   if (imageUrl && !button.disabled) form.requestSubmit();
 });
+
+try {
+  startWorker();
+} catch {
+  // Generate retries startup and reports an error if it still fails.
+}

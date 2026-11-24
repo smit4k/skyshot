@@ -5,7 +5,11 @@
   "scripts": {
     "build": "node scripts/build-site.mjs",
     "build:wasm": "sh scripts/build-wasm.sh",
-    "test:site": "node --test tests/site.test.mjs"
+    "test:site": "node --test tests/site.test.mjs",
+    "test:fonts": "node --test tests/fonts.test.mjs",
+    "test:wasm": "node --test tests/wasm.test.mjs",
+    "test:chrome": "node scripts/check-chrome.mjs",
+    "bench": "node scripts/bench.mjs"
   },
   "engines": { "node": ">=20" }
 }

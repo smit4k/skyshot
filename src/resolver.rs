@@ -21,13 +21,13 @@ impl PostLookup {
         })
     }
 
-    /// Build the public thread request. Use one parent for the default reply indicator.
+    /// Build the public thread request by handle or DID. Use one parent for the default reply indicator.
     pub fn thread_url(&self, did: Option<&str>, ancestors: usize) -> Result<Url, RenderError> {
-        let did = did.unwrap_or(&self.actor);
-        if !valid_did(did) || ancestors > 3 {
+        if did.is_some_and(|did| !valid_did(did)) || ancestors > 3 {
             return Err(RenderError::Input("invalid DID or ancestor count"));
         }
-        let uri = format!("at://{did}/app.bsky.feed.post/{}", self.rkey);
+        let actor = did.unwrap_or(&self.actor);
+        let uri = format!("at://{actor}/app.bsky.feed.post/{}", self.rkey);
         Ok(request(
             "app.bsky.feed.getPostThread",
             &[

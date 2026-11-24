@@ -6,6 +6,11 @@
     <meta name="description" content="Turn a Bluesky post into a PNG, right in your browser.">
     <meta name="color-scheme" content="light dark">
     <title>Skyshot — Bluesky posts to PNG</title>
+    <script>
+      if (!location.pathname.endsWith('/') && !location.pathname.endsWith('/index.html')) {
+        location.replace(`${location.pathname}/${location.search}${location.hash}`);
+      }
+    </script>
     <link rel="icon" href="data:,">
     <link rel="stylesheet" href="./style.css">
     <script type="module" src="./app.mjs"></script>

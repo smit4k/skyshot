@@ -42,6 +42,11 @@ pub struct RenderResult {
 pub struct Renderer(draw::TextEngine);
 
 impl Renderer {
+    /// Add a fallback font while retaining the existing font and glyph caches.
+    pub fn add_font(&mut self, font: Vec<u8>) -> Result<(), RenderError> {
+        self.0.add_font(font)
+    }
+
     /// Create a renderer with bundled Inter. Pass open fallback font bytes to
     /// [Self::with_fonts] for color emoji and additional scripts.
     pub fn new() -> Result<Self, RenderError> {

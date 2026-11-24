@@ -14,47 +14,92 @@ test('static build includes the page and the complete browser renderer', async (
   assert.match(html, /<h1>Skyshot<\/h1>/);
   assert.match(html, /<form>/);
   assert.match(html, /<img id="preview"/);
+  const redirect = html.match(/<script>([\s\S]*?)<\/script>/)[1];
+  for (const [pathname, expected] of [
+    ['/', undefined], ['/skyshot/', undefined], ['/skyshot/index.html', undefined],
+    ['/skyshot', '/skyshot/?post=example#preview'],
+    ['/tools/skyshot', '/tools/skyshot/?post=example#preview'],
+  ]) {
+    let target;
+    runInNewContext(redirect, { location: {
+      pathname, search: '?post=example', hash: '#preview',
+      replace(url) { target = url; },
+    } });
+    assert.equal(target, expected, pathname);
+  }
   assert.deepEqual([...html.matchAll(/name="theme" value="(.*?)"/g)].map(match => match[1]), ['light', 'dim', 'dark']);
-  for (const path of ['style.css', 'app.mjs', 'render-worker.mjs', 'skyshot/media-fetch.mjs', 'skyshot/web.mjs', 'skyshot/shared.mjs', 'skyshot/generated/skyshot.js', ...fontNames.map(name => `skyshot/fonts/${name}`)]) {
+  for (const path of ['style.css', 'app.mjs', 'render-worker.mjs', 'warmup/avatar.jpg', 'warmup/tiles.png', 'skyshot/media-fetch.mjs', 'skyshot/web.mjs', 'skyshot/shared.mjs', 'skyshot/generated/skyshot.js', ...fontNames.map(name => `skyshot/fonts/${name}`)]) {
     assert.ok((await readFile(new URL(`dist/${path}`, root))).length > 0, path);
   }
   const wasm = await readFile(new URL('dist/skyshot/generated/skyshot_bg.wasm', root));
   assert.deepEqual([...wasm.subarray(0, 4)], [0, 97, 115, 109]);
 });
 
-test('worker reports render time excluding loading and fetching, including theme changes', async () => {
+test('worker warms up silently and reports render time for the requested post only', async t => {
   const source = await readFile(new URL('site/render-worker.mjs', root), 'utf8');
-  const post = {};
-  const result = { png: new Uint8Array([1]), width: 1, height: 1, warnings: [] };
-  const messages = [];
-  let now = 0;
-  let fetches = 0;
-  const self = { postMessage(data, transfer) {
-    if (!data.png) return;
-    assert.equal(transfer[0], result.png.buffer);
-    assert.equal(data.png, result.png);
-    messages.push(data);
-  } };
-  runInNewContext(source.replace(/^import .*;\n/, ''), {
-    self,
-    performance: { now: () => now },
-    loadSkyshot: async () => {
-      now += 100;
-      return {
-        async resolve() { now += 200; fetches++; return post; },
-        render(input, { theme }) {
-          assert.equal(input, post);
-          now += theme === 'light' ? 2.75 : 5.75;
-          return result;
-        },
-      };
-    },
+  for (const scenario of ['samples ready', 'early submission', 'sample fetch failed']) await t.test(scenario, async () => {
+    const post = {};
+    const result = { png: new Uint8Array([1]), width: 1, height: 1, warnings: [] };
+    const messages = [];
+    const warmups = [];
+    const sampleRequests = [];
+    let now = 0;
+    let fetches = 0;
+    let finishSampleFetch;
+    const sampleFetch = new Promise(resolve => { finishSampleFetch = resolve; });
+    const self = { postMessage(data, transfer) {
+      if (data.png) {
+        assert.equal(transfer[0], result.png.buffer);
+        assert.equal(data.png, result.png);
+      }
+      messages.push(data);
+    } };
+    runInNewContext(source.replace(/^import .*;\n/, ''), {
+      self,
+      performance: { now: () => now },
+      fetch: async path => {
+        sampleRequests.push(path);
+        await sampleFetch;
+        return { ok: scenario !== 'sample fetch failed', arrayBuffer: async () => new ArrayBuffer(1) };
+      },
+      loadSkyshot: async () => {
+        now += 100;
+        return {
+          async resolve() { now += 200; fetches++; return post; },
+          render(input, options) {
+            if (options === undefined) {
+              assert.match((input.post ?? input).record.text, /^[\x20-\x7e]+$/);
+              if (input.assets) {
+                assert.ok(input.assets.get(input.post.author.avatar).byteLength);
+                assert.ok(input.assets.get(input.post.embed.images[0].thumb).byteLength);
+              }
+              warmups.push(input.assets ? 'images' : 'text');
+              now += 1000;
+              return result;
+            }
+            assert.equal(input, post);
+            now += options.theme === 'light' ? 2.75 : 5.75;
+            return result;
+          },
+        };
+      },
+    });
+    await Promise.resolve();
+    assert.deepEqual(warmups, ['text']);
+    assert.deepEqual(sampleRequests, ['./warmup/avatar.jpg', './warmup/tiles.png']);
+    assert.deepEqual(messages, []);
+    const render = theme => self.onmessage({ data: { link: 'https://bsky.app/profile/example/post/123', theme } });
+    if (scenario === 'early submission') await render('light');
+    const count = messages.length;
+    finishSampleFetch();
+    await new Promise(resolve => setImmediate(resolve));
+    assert.deepEqual(warmups, scenario === 'samples ready' ? ['text', 'images'] : ['text']);
+    assert.equal(messages.length, count);
+    if (scenario !== 'early submission') await render('light');
+    await render('dark');
+    assert.deepEqual(messages.filter(data => data.png).map(data => data.renderMs), [2.75, 5.75]);
+    assert.equal(fetches, 1);
   });
-  for (const theme of ['light', 'dark']) {
-    await self.onmessage({ data: { link: 'https://bsky.app/profile/example/post/123', theme } });
-  }
-  assert.deepEqual(messages.map(data => data.renderMs), [2.75, 5.75]);
-  assert.equal(fetches, 1);
 });
 
 test('browser media uses a verified first-party PDS and retains fetch safeguards', async t => {

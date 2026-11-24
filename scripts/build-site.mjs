@@ -13,6 +13,10 @@ try {
 
 await mkdir(new URL('skyshot/', dist), { recursive: true });
 await cp(new URL('site/', root), dist, { recursive: true });
+await mkdir(new URL('warmup/', dist), { recursive: true });
+for (const path of ['avatar.jpg', 'tiles.png']) {
+  await cp(new URL(`tests/fixtures/${path}`, root), new URL(`warmup/${path}`, dist));
+}
 for (const path of ['web.mjs', 'shared.mjs', 'media-fetch.mjs', 'generated', 'fonts', 'LICENSE-Bluesky-icons']) {
   await cp(new URL(path, pkg), new URL(`skyshot/${path}`, dist), { recursive: true });
 }

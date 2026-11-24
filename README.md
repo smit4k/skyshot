@@ -59,7 +59,9 @@ const { png } = skyshot.render(post, options);
 await writeFile('post.png', png);
 ```
 
-Use the web entry point in a browser or worker and serve the generated WASM and fonts alongside it. Pass `{ fonts: [...] }` to customize or reduce the fallback download, and `{ fetch }` to provide the resolver's HTTP implementation. The browser and Node wrappers use the local time zone and hour cycle by default. Set `timeZone` and `hour12` to pin those values. `render` is synchronous and accepts fetched data, raw AppView JSON, or `{ post, assets }` with a URL-to-`Uint8Array` map.
+Use the web entry point in a browser or worker and serve the generated WASM and fonts alongside it. Pass `{ fonts: [...] }` to customize the fonts, and `{ fetch }` to provide the resolver's HTTP implementation. The browser and Node wrappers use the local time zone and hour cycle by default. Set `timeZone` and `hour12` to pin those values. `render` is synchronous and accepts fetched data, raw AppView JSON, or `{ post, assets }` with a URL-to-`Uint8Array` map. `renderMany(input, optionsList)` renders up to eight layouts with shared image caches and reports `renderMs` for each PNG after batch setup.
+
+For smaller startup downloads, use `loadSkyshot({ lazy: true })`. `resolve()` automatically prepares fallback fonts; for offline JSON, call `await skyshot.prepare(post)` before `skyshot.render(post)`. Required fonts load concurrently and their bytes are cached between loaders. An ASCII post uses bundled Inter without downloading fallback fonts. Rendering unprepared text in lazy mode throws instead of silently omitting its fonts. Supplying an explicit `fonts` array keeps the caller in control and disables automatic font loading. The default remains eager loading for compatibility.
 
 ## Website
 
@@ -74,7 +76,7 @@ python3 -m http.server 4321 --directory dist --bind 127.0.0.1
 
 Open `http://127.0.0.1:4321`. Deploy the contents of `dist/` to any static host; relative asset paths also work under a subdirectory. Serve `.wasm` as `application/wasm`. The page follows the system light or dark theme; the image theme defaults to Light.
 
-The renderer and its full set of fallback fonts load on the first submission (about 55 MiB). Subsequent submissions reuse the worker. Posts are fetched directly from Bluesky's public API; no application server receives the link. Because the image CDN blocks browser reads, the site resolves PLC identities and fetches image blobs from verified Bluesky-hosted PDS servers. Other media hosts, unavailable blobs, and blocked video thumbnails use the renderer's placeholders with a warning.
+The renderer loads in a worker when the page opens and requires a browser with WebAssembly SIMD support. The worker warms the text renderer, then decodes and renders a bundled JPEG and PNG while waiting for the first submission. The site downloads fallback fonts only when the supplied post needs their scripts. An ASCII post needs no fallback download. The current WASM core is about 1.83 MiB gzipped. The complete optional fallback set is still about 51 MiB. Subsequent submissions reuse the worker, loaded fonts, and recently prepared images. Posts are fetched by handle or DID in one request to Bluesky's public API. Visible media downloads run up to four at a time within the existing byte limits. Because the image CDN blocks browser reads, the site resolves PLC identities and fetches image blobs from verified Bluesky-hosted PDS servers. Other media hosts, unavailable blobs, and blocked video thumbnails use the renderer's placeholders with a warning.
 
 ```sh
 npm run test:site
@@ -89,6 +91,10 @@ cargo test --locked
 cargo build --release --locked
 sh scripts/build-wasm.sh
 node --test tests/wasm.test.mjs
+npm run test:fonts
+npm run bench
+SKYSHOT_VERIFY=1 sh scripts/build-wasm.sh
+npm run test:chrome
 ```
 
-The Node tests compare encoded PNG bytes from both builds for the same inputs and assets. See [SPEC.md](SPEC.md) for the visual reference, visibility rules, limits, and known differences.
+The Node tests compare encoded PNG bytes from both builds for the same inputs and assets. CI also compares the same frozen PNG corpus across Linux, macOS, and WASM. The Chrome check reports known layout differences and rejects new ones; `npm run test:chrome -- --strict` requires zero differences and currently fails. See [PERFORMANCE.md](PERFORMANCE.md) for measurements and oracle scope, and [SPEC.md](SPEC.md) for the visual reference, visibility rules, limits, and known differences.

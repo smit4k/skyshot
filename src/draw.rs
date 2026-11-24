@@ -1,5 +1,5 @@
 use std::{
-    collections::{BTreeMap, BTreeSet},
+    collections::{BTreeMap, BTreeSet, VecDeque},
     io::Cursor,
 };
 
@@ -7,10 +7,13 @@ use cosmic_text::{
     Attrs, Buffer, Color, Ellipsize, EllipsizeHeightLimit, Fallback, Family, FeatureTag,
     FontFeatures, FontSystem, Metrics, Shaping, SwashCache, Weight, Wrap, fontdb,
 };
-use image::{ImageDecoder, ImageEncoder, ImageReader, codecs::png::PngEncoder};
+use image::{
+    ImageDecoder, ImageEncoder, ImageFormat, ImageReader,
+    codecs::png::{CompressionType, FilterType, PngEncoder},
+};
 use tiny_skia::{
-    Color as Ink, FillRule, FilterQuality, Mask, Paint, Path, PathBuilder, Pixmap, PixmapPaint,
-    PremultipliedColorU8, Rect, Stroke, Transform,
+    Color as Ink, FillRule, Mask, Paint, Path, PathBuilder, Pixmap, PremultipliedColorU8, Rect,
+    Stroke, Transform,
 };
 use unicode_script::Script;
 
@@ -23,6 +26,7 @@ pub(crate) struct TextEngine {
     fonts: FontSystem,
     glyphs: SwashCache,
     primary: String,
+    images: ImageCache,
 }
 
 struct NotoFallback;
@@ -69,6 +73,16 @@ pub(crate) struct TextBlock {
 pub(crate) type Span = (String, Option<u32>);
 
 impl TextEngine {
+    pub fn add_font(&mut self, font: Vec<u8>) -> Result<(), RenderError> {
+        let db = self.fonts.db_mut();
+        let before = db.len();
+        db.load_font_data(font);
+        if db.len() == before {
+            return Err(RenderError::Font);
+        }
+        Ok(())
+    }
+
     pub fn new(fonts: impl IntoIterator<Item = Vec<u8>>) -> Result<Self, RenderError> {
         let mut db = fontdb::Database::new();
         db.load_font_data(include_bytes!("../fonts/InterVariable.ttf").to_vec());
@@ -94,6 +108,7 @@ impl TextEngine {
             ),
             glyphs: SwashCache::new(),
             primary,
+            images: ImageCache::default(),
         })
     }
 
@@ -142,6 +157,24 @@ impl TextEngine {
             height,
             width: measured_width,
         }
+    }
+}
+
+#[cfg(all(feature = "verify", feature = "wasm", target_arch = "wasm32"))]
+impl TextBlock {
+    pub(crate) fn report(&self) -> serde_json::Value {
+        serde_json::json!({
+            "height": self.height,
+            "lines": self.buffer.layout_runs().map(|line| {
+                let start = line.glyphs.iter().map(|g| g.start).min().unwrap_or(0);
+                let end = line.glyphs.iter().map(|g| g.end).max().unwrap_or(0);
+                serde_json::json!({
+                    "text": line.text.get(start..end).unwrap_or_default(),
+                    "width": line.line_w,
+                    "rtl": line.rtl,
+                })
+            }).collect::<Vec<_>>(),
+        })
     }
 }
 
@@ -330,14 +363,18 @@ pub(crate) fn paint(
                 if asset_bytes > MAX_ASSETS {
                     return Err(RenderError::Limit("total image bytes"));
                 }
-                if !image(&mut pix, rect, radius, scale, bytes, cover) {
+                if !text
+                    .images
+                    .draw(&mut pix, rect, radius, scale, bytes, cover)
+                {
                     warnings.push(Warning::InvalidAsset(url));
                 }
             }
         }
     }
     let mut png = Vec::new();
-    PngEncoder::new(&mut png).write_image(
+    // A fixed vertical filter avoids trying five filters on every scanline.
+    PngEncoder::new_with_quality(&mut png, CompressionType::Fast, FilterType::Up).write_image(
         pix.data(),
         width,
         height,
@@ -346,13 +383,20 @@ pub(crate) fn paint(
     Ok((png, width, height))
 }
 
-fn decode(bytes: &[u8]) -> Option<image::RgbaImage> {
+struct DecodedImage {
+    jpeg_size: Option<(u32, u32)>,
+    reduction: u32,
+    pixels: image::RgbaImage,
+}
+
+fn decode(bytes: &[u8], size: TileSize) -> Option<DecodedImage> {
     if bytes.len() > MAX_BYTES {
         return None;
     }
     let mut reader = ImageReader::new(Cursor::new(bytes))
         .with_guessed_format()
         .ok()?;
+    let jpeg = reader.format() == Some(ImageFormat::Jpeg);
     let mut limits = image::Limits::default();
     limits.max_image_width = Some(8192);
     limits.max_image_height = Some(8192);
@@ -364,65 +408,356 @@ fn decode(bytes: &[u8]) -> Option<image::RgbaImage> {
         return None;
     }
     let orientation = decoder.orientation().ok()?;
-    let mut raster = image::DynamicImage::from_decoder(decoder).ok()?;
+    let (oriented_w, oriented_h) = match orientation {
+        image::metadata::Orientation::Rotate90
+        | image::metadata::Orientation::Rotate270
+        | image::metadata::Orientation::Rotate90FlipH
+        | image::metadata::Orientation::Rotate270FlipH => (h, w),
+        _ => (w, h),
+    };
+    let jpeg_size = jpeg.then_some((oriented_w, oriented_h));
+    let reduction = size.jpeg_reduction(jpeg_size);
+    let reduced = if reduction > 1 {
+        decode_small_jpeg(bytes, w.div_ceil(reduction), h.div_ceil(reduction))
+    } else {
+        None
+    };
+    let mut raster = match reduced {
+        Some(raster) => raster,
+        None => image::DynamicImage::from_decoder(decoder).ok()?,
+    };
     raster.apply_orientation(orientation);
-    Some(raster.into_rgba8())
+    let mut pixels = raster.into_rgba8();
+    for pixel in pixels.pixels_mut() {
+        pixel.0 = premultiply(pixel.0);
+    }
+    Some(DecodedImage {
+        jpeg_size,
+        reduction,
+        pixels,
+    })
 }
 
-fn image(pix: &mut Pixmap, rect: Rect, radius: f32, scale: f32, bytes: &[u8], cover: bool) -> bool {
-    let Some(raster) = decode(bytes) else {
-        return false;
-    };
-    let (w, h) = raster.dimensions();
-    let mut data = raster.into_raw();
-    for rgba in data.chunks_exact_mut(4) {
-        let a = u32::from(rgba[3]);
-        for c in &mut rgba[..3] {
-            *c = ((u32::from(*c) * a + 127) / 255) as u8;
+fn decode_small_jpeg(bytes: &[u8], width: u32, height: u32) -> Option<image::DynamicImage> {
+    let mut jpeg = jpeg_decoder::Decoder::new(Cursor::new(bytes));
+    jpeg.set_max_decoding_buffer_size(96 * 1024 * 1024);
+    let (w, h) = jpeg
+        .scale(width.try_into().ok()?, height.try_into().ok()?)
+        .ok()?;
+    let pixels = jpeg.decode().ok()?;
+    match jpeg.info()?.pixel_format {
+        jpeg_decoder::PixelFormat::RGB24 => image::RgbImage::from_raw(w.into(), h.into(), pixels)
+            .map(image::DynamicImage::ImageRgb8),
+        jpeg_decoder::PixelFormat::L8 => image::GrayImage::from_raw(w.into(), h.into(), pixels)
+            .map(image::DynamicImage::ImageLuma8),
+        _ => None,
+    }
+}
+
+#[derive(Clone, Copy, PartialEq)]
+struct TileSize {
+    width: u32,
+    height: u32,
+    radius: f32,
+    cover: bool,
+}
+
+impl TileSize {
+    fn jpeg_reduction(self, source: Option<(u32, u32)>) -> u32 {
+        let Some((width, height)) = source else {
+            return 1;
+        };
+        let (x, y) = (width / self.width, height / self.height);
+        match if self.cover { x.min(y) } else { x.max(y) } {
+            0..=1 => 1,
+            2..=3 => 2,
+            4..=7 => 4,
+            _ => 8,
         }
     }
-    let Some(source) = tiny_skia::PixmapRef::from_bytes(&data, w, h) else {
-        return false;
-    };
-    let x = (rect.x() * scale).round() as i32;
-    let y = (rect.y() * scale).round() as i32;
-    let dw = ((rect.right() * scale).round() as i32 - x).max(1) as u32;
-    let dh = ((rect.bottom() * scale).round() as i32 - y).max(1) as u32;
+}
+
+enum CachedPixels {
+    Decoded(DecodedImage),
+    Tile(TileSize, Pixmap),
+}
+
+impl CachedPixels {
+    fn len(&self) -> usize {
+        match self {
+            Self::Decoded(image) => image.pixels.len(),
+            Self::Tile(_, tile) => tile.data().len(),
+        }
+    }
+}
+
+#[derive(Default)]
+struct ImageCache {
+    entries: VecDeque<(Vec<u8>, CachedPixels)>,
+    bytes: usize,
+}
+
+impl ImageCache {
+    fn insert(&mut self, bytes: &[u8], pixels: CachedPixels) {
+        const CACHE_LIMIT: usize = 32 * 1024 * 1024;
+        let cost = bytes.len() + pixels.len();
+        if cost > CACHE_LIMIT {
+            return;
+        }
+        while self.bytes + cost > CACHE_LIMIT || self.entries.len() >= 32 {
+            let Some((bytes, pixels)) = self.entries.pop_front() else {
+                break;
+            };
+            self.bytes -= bytes.len() + pixels.len();
+        }
+        self.bytes += cost;
+        self.entries.push_back((bytes.to_vec(), pixels));
+    }
+
+    fn tile(&mut self, bytes: &[u8], size: TileSize) -> Option<Pixmap> {
+        if let Some(decoded) = self
+            .entries
+            .iter()
+            .rev()
+            .find_map(|(source, entry)| match entry {
+                CachedPixels::Decoded(decoded)
+                    if decoded.reduction == size.jpeg_reduction(decoded.jpeg_size)
+                        && source == bytes =>
+                {
+                    Some(decoded)
+                }
+                _ => None,
+            })
+        {
+            return image_tile(&decoded.pixels, size);
+        }
+        let decoded = decode(bytes, size)?;
+        let tile = image_tile(&decoded.pixels, size)?;
+        self.insert(bytes, CachedPixels::Decoded(decoded));
+        Some(tile)
+    }
+
+    fn draw(
+        &mut self,
+        dst: &mut Pixmap,
+        rect: Rect,
+        radius: f32,
+        scale: f32,
+        bytes: &[u8],
+        cover: bool,
+    ) -> bool {
+        let x = (rect.x() * scale).round() as i32;
+        let y = (rect.y() * scale).round() as i32;
+        let size = TileSize {
+            width: ((rect.right() * scale).round() as i32 - x).max(1) as u32,
+            height: ((rect.bottom() * scale).round() as i32 - y).max(1) as u32,
+            radius: radius * scale,
+            cover,
+        };
+        if let Some(tile) = self
+            .entries
+            .iter()
+            .rev()
+            .find_map(|(source, entry)| match entry {
+                CachedPixels::Tile(key, tile) if *key == size && source == bytes => Some(tile),
+                _ => None,
+            })
+        {
+            blit_image(dst, tile, x, y);
+            return true;
+        }
+        let Some(tile) = self.tile(bytes, size) else {
+            return false;
+        };
+        blit_image(dst, &tile, x, y);
+        self.insert(bytes, CachedPixels::Tile(size, tile));
+        true
+    }
+}
+
+fn blit_image(dst: &mut Pixmap, tile: &Pixmap, x: i32, y: i32) {
+    let left = x.max(0);
+    let top = y.max(0);
+    let right = x
+        .saturating_add(tile.width() as i32)
+        .min(dst.width() as i32);
+    let bottom = y
+        .saturating_add(tile.height() as i32)
+        .min(dst.height() as i32);
+    if left >= right || top >= bottom {
+        return;
+    }
+    let src_stride = tile.width() as usize * 4;
+    let dst_stride = dst.width() as usize * 4;
+    let row_bytes = (right - left) as usize * 4;
+    let src = tile.data();
+    let dst = dst.data_mut();
+    for row in top..bottom {
+        let from = (row - y) as usize * src_stride + (left - x) as usize * 4;
+        let to = row as usize * dst_stride + left as usize * 4;
+        for (src, dst) in src[from..from + row_bytes]
+            .chunks_exact(4)
+            .zip(dst[to..to + row_bytes].chunks_exact_mut(4))
+        {
+            match src[3] {
+                255 => dst.copy_from_slice(src),
+                0 => {}
+                a => {
+                    let keep = u16::from(255 - a);
+                    // The destination is opaque and the tile is already premultiplied.
+                    for channel in 0..3 {
+                        dst[channel] =
+                            src[channel] + ((u16::from(dst[channel]) * keep + 127) / 255) as u8;
+                    }
+                }
+            }
+        }
+    }
+}
+
+fn premultiply([r, g, b, a]: [u8; 4]) -> [u8; 4] {
+    if a == 255 {
+        return [r, g, b, a];
+    }
+    let channel = |value| ((u16::from(value) * u16::from(a) + 127) / 255) as u8;
+    [channel(r), channel(g), channel(b), a]
+}
+
+struct Tap {
+    first: usize,
+    next: usize,
+    weight: u32,
+}
+
+fn taps(range: std::ops::Range<usize>, offset: f32, scale: f32, extent: usize) -> Vec<Tap> {
+    range
+        .map(|destination| {
+            let source =
+                ((destination as f32 + 0.5 - offset) / scale - 0.5).clamp(0.0, (extent - 1) as f32);
+            let first = source as usize;
+            Tap {
+                first,
+                next: (first + 1).min(extent - 1),
+                weight: ((source - first as f32) * 256.0).round() as u32,
+            }
+        })
+        .collect()
+}
+
+fn image_tile(raster: &image::RgbaImage, size: TileSize) -> Option<Pixmap> {
+    let TileSize {
+        width: dw,
+        height: dh,
+        radius,
+        cover,
+    } = size;
+    let (w, h) = raster.dimensions();
     let (sx, sy) = (dw as f32 / w as f32, dh as f32 / h as f32);
     let k = if cover { sx.max(sy) } else { sx.min(sy) };
-    let Some(mut tile) = Pixmap::new(dw, dh) else {
-        return false;
-    };
-    let t = Transform::from_scale(k, k).post_translate(
-        (dw as f32 - w as f32 * k) / 2.0,
-        (dh as f32 - h as f32 * k) / 2.0,
-    );
-    tile.draw_pixmap(
-        0,
-        0,
-        source,
-        &PixmapPaint {
-            quality: FilterQuality::Bilinear,
-            ..PixmapPaint::default()
-        },
-        t,
-        None,
-    );
+    let tx = (dw as f32 - w as f32 * k) / 2.0;
+    let ty = (dh as f32 - h as f32 * k) / 2.0;
+    let mut tile = Pixmap::new(dw, dh)?;
+    let pixels = raster.as_raw().as_chunks::<4>().0;
+    let (left, top) = (tx.round().max(0.0) as usize, ty.round().max(0.0) as usize);
+    let right = ((dw as f32 - tx).round() as usize).min(dw as usize);
+    let bottom = ((dh as f32 - ty).round() as usize).min(dh as usize);
+    let columns = taps(left..right, tx, k, w as usize);
+    let rows = taps(top..bottom, ty, k, h as usize);
+    let dest = tile.data_mut().as_chunks_mut::<4>().0;
+    for (row, y) in dest.chunks_exact_mut(dw as usize).skip(top).zip(rows) {
+        let above = &pixels[y.first * w as usize..][..w as usize];
+        let below = &pixels[y.next * w as usize..][..w as usize];
+        for (pixel, x) in row[left..right].iter_mut().zip(&columns) {
+            let (a, b) = (above[x.first], above[x.next]);
+            let (c, d) = (below[x.first], below[x.next]);
+            *pixel = std::array::from_fn(|i| {
+                let upper = u32::from(a[i]) * (256 - x.weight) + u32::from(b[i]) * x.weight;
+                let lower = u32::from(c[i]) * (256 - x.weight) + u32::from(d[i]) * x.weight;
+                ((upper * (256 - y.weight) + lower * y.weight + 32768) >> 16) as u8
+            });
+        }
+    }
     if radius > 0.0
         && let Some(mut mask) = Mask::new(dw, dh)
         && let Some(rect) = Rect::from_xywh(0.0, 0.0, dw as f32, dh as f32)
-        && let Some(path) = rounded(rect, radius * scale)
+        && let Some(path) = rounded(rect, radius)
     {
         mask.fill_path(&path, FillRule::Winding, true, Transform::identity());
-        tile.apply_mask(&mask);
+        let edge = radius.min(dw.min(dh) as f32 / 2.0).ceil() as usize;
+        // Only rows that touch a rounded corner can contain partial coverage.
+        let width = dw as usize;
+        for (y, row) in tile
+            .data_mut()
+            .as_chunks_mut::<4>()
+            .0
+            .chunks_exact_mut(width)
+            .enumerate()
+        {
+            if y < edge || y >= dh as usize - edge {
+                for (pixel, &alpha) in row.iter_mut().zip(&mask.data()[y * width..][..width]) {
+                    if alpha != 255 {
+                        *pixel = pixel.map(|channel| {
+                            ((u16::from(channel) * u16::from(alpha) + 127) / 255) as u8
+                        });
+                    }
+                }
+            }
+        }
     }
-    pix.draw_pixmap(
-        x,
-        y,
-        tile.as_ref(),
-        &PixmapPaint::default(),
-        Transform::identity(),
-        None,
-    );
-    true
+    Some(tile)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn sampler_interpolates_premultiplied_color_and_handles_fit_and_cover() {
+        let pixels = image::RgbaImage::from_fn(2, 1, |x, _| {
+            image::Rgba(premultiply(if x == 0 {
+                [255, 0, 0, 255]
+            } else {
+                [0, 0, 255, 0]
+            }))
+        });
+        let size = TileSize {
+            width: 4,
+            height: 4,
+            radius: 0.0,
+            cover: false,
+        };
+        let contained = image_tile(&pixels, size).unwrap();
+        assert_eq!(&contained.data()[..16], &[0; 16]);
+        assert_eq!(
+            &contained.data()[16..32],
+            &[255, 0, 0, 255, 191, 0, 0, 191, 64, 0, 0, 64, 0, 0, 0, 0]
+        );
+        let covered = image_tile(
+            &pixels,
+            TileSize {
+                width: 2,
+                height: 2,
+                cover: true,
+                ..size
+            },
+        )
+        .unwrap();
+        assert_eq!(covered.data(), &[191, 0, 0, 191, 64, 0, 0, 64].repeat(2));
+    }
+
+    #[test]
+    fn rendering_different_tile_sizes_reuses_the_decode() {
+        let mut cache = ImageCache::default();
+        let bytes = include_bytes!("../tests/fixtures/tiles.png");
+        let size = TileSize {
+            width: 20,
+            height: 20,
+            radius: 5.0,
+            cover: true,
+        };
+        cache.tile(bytes, size).unwrap();
+        let larger = cache.tile(bytes, TileSize { width: 40, ..size }).unwrap();
+        assert_eq!(larger.width(), 40);
+        assert_eq!(cache.entries.len(), 1);
+    }
 }
