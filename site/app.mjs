@@ -38,9 +38,8 @@ function startWorker() {
     download.href = imageUrl;
     document.querySelector('figure').hidden = false;
     document.querySelector('#placeholder').hidden = true;
-    status.textContent = data.warnings.length
-      ? 'Image ready. Some details could not be rendered.'
-      : 'Image ready.';
+    status.textContent = `Rendered in ${data.renderMs.toFixed(1)} ms.`;
+    if (data.warnings.length) status.textContent += ' Some details could not be rendered.';
     finish();
   };
   worker.onerror = event => {

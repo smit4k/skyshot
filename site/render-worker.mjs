@@ -13,8 +13,10 @@ self.onmessage = async ({ data: { link, theme } }) => {
       currentLink = link;
     }
     self.postMessage({ status: 'Rendering image…' });
+    const started = performance.now();
     const result = skyshot.render(resolved, { theme });
-    self.postMessage(result, [result.png.buffer]);
+    const renderMs = performance.now() - started;
+    self.postMessage({ ...result, renderMs }, [result.png.buffer]);
   } catch (error) {
     self.postMessage({ error: `Could not render this post. ${error.message || 'Please try again.'}` });
   }

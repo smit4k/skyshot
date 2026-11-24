@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { readFile } from 'node:fs/promises';
 import { test } from 'node:test';
+import { runInNewContext } from 'node:vm';
 import { fontNames } from '../packages/skyshot/shared.mjs';
 import { createMediaFetch } from '../packages/skyshot/media-fetch.mjs';
 
@@ -19,6 +20,41 @@ test('static build includes the page and the complete browser renderer', async (
   }
   const wasm = await readFile(new URL('dist/skyshot/generated/skyshot_bg.wasm', root));
   assert.deepEqual([...wasm.subarray(0, 4)], [0, 97, 115, 109]);
+});
+
+test('worker reports render time excluding loading and fetching, including theme changes', async () => {
+  const source = await readFile(new URL('site/render-worker.mjs', root), 'utf8');
+  const post = {};
+  const result = { png: new Uint8Array([1]), width: 1, height: 1, warnings: [] };
+  const messages = [];
+  let now = 0;
+  let fetches = 0;
+  const self = { postMessage(data, transfer) {
+    if (!data.png) return;
+    assert.equal(transfer[0], result.png.buffer);
+    assert.equal(data.png, result.png);
+    messages.push(data);
+  } };
+  runInNewContext(source.replace(/^import .*;\n/, ''), {
+    self,
+    performance: { now: () => now },
+    loadSkyshot: async () => {
+      now += 100;
+      return {
+        async resolve() { now += 200; fetches++; return post; },
+        render(input, { theme }) {
+          assert.equal(input, post);
+          now += theme === 'light' ? 2.75 : 5.75;
+          return result;
+        },
+      };
+    },
+  });
+  for (const theme of ['light', 'dark']) {
+    await self.onmessage({ data: { link: 'https://bsky.app/profile/example/post/123', theme } });
+  }
+  assert.deepEqual(messages.map(data => data.renderMs), [2.75, 5.75]);
+  assert.equal(fetches, 1);
 });
 
 test('browser media uses a verified first-party PDS and retains fetch safeguards', async t => {
