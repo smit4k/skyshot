@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="Turn a Bluesky post into a PNG, right in your browser.">
+    <meta name="color-scheme" content="light dark">
+    <title>Skyshot — Bluesky posts to PNG</title>
+    <link rel="icon" href="data:,">
+    <link rel="stylesheet" href="./style.css">
+    <script type="module" src="./app.mjs"></script>
+  </head>
+  <body>
+    <main>
+      <header>
+        <h1>Skyshot</h1>
+        <p>Turn a <a href="https://bsky.app">Bluesky</a> post into a PNG, right in your browser.</p>
+      </header>
+
+      <form>
+        <label for="post-link">Post link</label>
+        <div class="input-row">
+          <input id="post-link" name="link" type="url" placeholder="https://bsky.app/profile/…/post/…" required maxlength="2048" autocomplete="off" spellcheck="false" aria-describedby="status">
+          <button type="submit">Generate <span aria-hidden="true">→</span></button>
+        </div>
+        <fieldset id="themes">
+          <legend>Image theme</legend>
+          <div class="theme-options">
+            <label class="theme-choice light"><input type="radio" name="theme" value="light" checked> Light</label>
+            <label class="theme-choice dim"><input type="radio" name="theme" value="dim"> Dim</label>
+            <label class="theme-choice dark"><input type="radio" name="theme" value="dark"> Dark</label>
+          </div>
+        </fieldset>
+      </form>
+
+      <p id="status" role="status" aria-live="polite"></p>
+      <noscript><p>Enable JavaScript to render a post in your browser.</p></noscript>
+
+      <div id="output" aria-busy="false">
+        <p id="placeholder">Your image will appear here.</p>
+        <figure hidden>
+          <img id="preview" alt="Rendered Bluesky post">
+          <figcaption><a id="download" download="skyshot.png">Download PNG <span aria-hidden="true">↓</span></a></figcaption>
+        </figure>
+      </div>
+    </main>
+  </body>
+</html>

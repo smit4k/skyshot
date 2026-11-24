@@ -1,0 +1,14 @@
+/target
+/fonts/fallback/
+/packages/skyshot/generated/
+/packages/skyshot/fonts/
+/node_modules/
+/dist/
+/post.png
+/.playwright-mcp/
+.DS_Store
+__pycache__/
+.pytest_cache/
+*.pyc
+test_*.py
+*_test.py

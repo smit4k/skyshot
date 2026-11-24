@@ -1,0 +1,11 @@
+{
+  "name": "skyshot-site",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node scripts/build-site.mjs",
+    "build:wasm": "sh scripts/build-wasm.sh",
+    "test:site": "node --test tests/site.test.mjs"
+  },
+  "engines": { "node": ">=20" }
+}

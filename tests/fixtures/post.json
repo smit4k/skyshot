@@ -1,0 +1,16 @@
+{
+  "uri": "at://did:plc:example/app.bsky.feed.post/3lsample",
+  "author": {"did":"did:plc:example","handle":"skyshot.example","displayName":"Skyshot Demo","avatar":"https://cdn.bsky.app/img/avatar/plain/demo","verification":{"verifiedStatus":"valid"}},
+  "record": {
+    "$type": "app.bsky.feed.post",
+    "text":"👋 Hello, Bluesky! Try https://bsky.app\nمرحبا · 你好 · Café · 👩‍💻",
+    "createdAt":"2025-03-04T12:30:00Z",
+    "facets":[{"index":{"byteStart":25,"byteEnd":41},"features":[{"$type":"app.bsky.richtext.facet#link","uri":"https://bsky.app"}]}]
+  },
+  "indexedAt":"2025-03-04T12:30:01Z",
+  "replyCount":14,
+  "repostCount":123,
+  "likeCount":3456,
+  "quoteCount":3,
+  "bookmarkCount":12
+}

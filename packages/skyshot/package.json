@@ -1,0 +1,24 @@
+{
+  "name": "skyshot",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Browserless Bluesky post to PNG renderer",
+  "types": "./index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./index.d.ts",
+      "node": "./node.mjs",
+      "default": "./web.mjs"
+    },
+    "./node": {
+      "types": "./index.d.ts",
+      "default": "./node.mjs"
+    },
+    "./web": {
+      "types": "./index.d.ts",
+      "default": "./web.mjs"
+    }
+  },
+  "files": ["*.mjs", "index.d.ts", "generated", "fonts", "LICENSE-Bluesky-icons", "README.md"],
+  "engines": { "node": ">=20" }
+}
