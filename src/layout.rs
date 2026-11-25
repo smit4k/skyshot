@@ -8,7 +8,9 @@ use crate::{
     RenderInput, RenderOptions, Theme, Warning,
     draw::{Item, Scene, Span, TextEngine, TextStyle},
     icons::Icon,
-    model::{Entry, Post, Record, Visibility, aspect, hidden_record, kind, media_images, string},
+    model::{
+        Author, Entry, Post, Record, Visibility, aspect, hidden_record, kind, media_images, string,
+    },
 };
 
 const PAD: f32 = 16.0;
@@ -137,27 +139,7 @@ impl Layout<'_> {
         let wide = w >= 568.0;
         let follow_width = if wide { 86.0 } else { 68.0 };
         let header_w = w - AVATAR - 24.0 - follow_width;
-        let badge = if post.author.verified() { 20.0 } else { 0.0 };
-        let (_, name_width) = self.label(
-            post.author.name(),
-            header_x,
-            y,
-            header_w - badge,
-            LARGE,
-            self.colors.text,
-            Some(1),
-        );
-        if badge > 0.0 {
-            let x = header_x + name_width + 4.0;
-            let y = y + 4.0;
-            if post.author.trusted_verifier() {
-                self.icon(Icon::Verifier, x, y, 14.0, 0x006aff);
-                self.icon(Icon::VerifierCheck, x, y, 14.0, 0xffffff);
-            } else {
-                self.rect([x, y, 14.0, 14.0], 7.0, Some(0x006aff), None);
-                self.icon(Icon::Check, x, y, 14.0, 0xffffff);
-            }
-        }
+        self.author_name(&post.author, [header_x, y, header_w], LARGE);
         self.label(
             &format!("@{}", post.author.handle),
             header_x,
@@ -303,12 +285,7 @@ impl Layout<'_> {
         let x = PAD + AVATAR + 12.0;
         let inner = w - AVATAR - 12.0;
         self.avatar(post.author.avatar.as_deref(), PAD, y, AVATAR);
-        let meta = format!("{}  @{}", post.author.name(), post.author.handle);
-        let top = y
-            + self
-                .label(&meta, x, y, inner, MEDIUM, self.colors.text, Some(1))
-                .0
-            + 4.0;
+        let top = y + self.author_meta(&post.author, [x, y, inner]) + 4.0;
         let bottom = self.body(post, x, top, inner, true) + 4.0;
         self.controls(post, x, bottom, inner, true);
         let end = (bottom + 34.0).max(y + AVATAR + 18.0);
@@ -611,25 +588,12 @@ impl Layout<'_> {
         let inner = w - 24.0;
         match kind(record) {
             "app.bsky.embed.record#viewRecord" => {
-                let author = &record["author"];
-                self.avatar(as_url(author, "avatar"), left, top, 20.0);
-                let handle = string(author, "handle");
-                let name = string(author, "displayName");
-                let author_line = if name.is_empty() {
-                    format!("@{handle}")
-                } else {
-                    format!("{name}  @{handle}")
-                };
-                self.label(
-                    &author_line,
-                    left + 26.0,
-                    top + 1.0,
-                    inner - 26.0,
-                    SMALL,
-                    self.colors.text,
-                    Some(1),
-                );
-                top += 25.0;
+                top += 2.0;
+                self.avatar(as_url(&record["author"], "avatar"), left, top + 1.0, 16.0);
+                if let Ok(author) = serde_json::from_value::<Author>(record["author"].clone()) {
+                    self.author_meta(&author, [left + 22.0, top, inner - 22.0]);
+                }
+                top += 22.0;
                 if let Ok(quoted) = serde_json::from_value::<Record>(record["value"].clone())
                     && !quoted.text.is_empty()
                     && quoted.text.len() <= 3000
@@ -652,6 +616,7 @@ impl Layout<'_> {
                 if let Some(media) = record["embeds"].as_array().and_then(|a| a.first()) {
                     top = self.embed(media, left, top + 6.0, inner, 1, true);
                 }
+                top += 2.0;
             }
             "app.bsky.feed.defs#generatorView"
             | "app.bsky.graph.defs#listView"
@@ -825,6 +790,72 @@ impl Layout<'_> {
             self.colors.muted,
         );
         self.image(url, [x, y, size, size], size / 2.0, true);
+    }
+
+    fn author_name(&mut self, author: &Author, [x, y, w]: [f32; 3], size: f32) -> f32 {
+        let badge_size = if size == LARGE { 14.0 } else { 12.0 };
+        let badge_width = if author.verified() {
+            badge_size + 2.0
+        } else {
+            0.0
+        };
+        let spacing = if size == LARGE { 22.0 } else { 18.0 };
+        let name = author
+            .name()
+            .chars()
+            .take(640)
+            .collect::<String>()
+            .replace(['\n', '\r'], " ");
+        let (_, width) = self.text_at(
+            &[(name, None)],
+            [x, y, w - badge_width],
+            TextStyle {
+                size,
+                spacing,
+                color: self.colors.text,
+                strong: true,
+                lines: Some(1),
+            },
+        );
+        if author.verified() {
+            let x = x + width + 2.0;
+            let y = y + (spacing - badge_size) / 2.0;
+            if author.trusted_verifier() {
+                self.icon(Icon::Verifier, x, y, badge_size, 0x006aff);
+                self.icon(Icon::VerifierCheck, x, y, badge_size, 0xffffff);
+            } else {
+                self.rect(
+                    [x, y, badge_size, badge_size],
+                    badge_size / 2.0,
+                    Some(0x006aff),
+                    None,
+                );
+                self.icon(Icon::Check, x, y, badge_size, 0xffffff);
+            }
+        }
+        width + badge_width
+    }
+
+    fn author_meta(&mut self, author: &Author, [x, y, w]: [f32; 3]) -> f32 {
+        let width = self.author_name(author, [x, y, w * 0.7], MEDIUM);
+        let handle = author
+            .handle
+            .chars()
+            .take(640)
+            .collect::<String>()
+            .replace(['\n', '\r'], " ");
+        self.text_at(
+            &[(format!("\u{a0}@{handle}"), None)],
+            [x + width, y, w - width],
+            TextStyle {
+                size: MEDIUM,
+                spacing: 18.0,
+                color: self.colors.muted,
+                strong: false,
+                lines: Some(1),
+            },
+        )
+        .0
     }
 
     fn notice(&mut self, label: &str, x: f32, y: f32, w: f32) -> f32 {

@@ -60,9 +60,11 @@ try {
   assert.ok(!result.exceptionDetails, JSON.stringify(result.exceptionDetails));
   const report = result.result.value;
   await writeFile(join(root, 'target/chrome-report.json'), JSON.stringify(report, null, 2) + '\n');
-  console.log(JSON.stringify({ chrome: report.userAgent, browserPerformance: report.browserPerformance, layouts: report.layouts, lineBreakMismatches: report.mismatches.length, widthErrorsOver1px: report.widthErrors.length, cards: report.cards, cardMismatches: report.cardMismatches.length, report: 'target/chrome-report.json' }, null, 2));
+  console.log(JSON.stringify({ chrome: report.userAgent, browserPerformance: report.browserPerformance, layouts: report.layouts, lineBreakMismatches: report.mismatches.length, widthErrorsOver1px: report.widthErrors.length, cards: report.cards, cardMismatches: report.cardMismatches.length, authorHeaders: report.authors.headers, authorMismatches: report.authors.mismatches.length, authorWidthErrorsOver1px: report.authors.widthErrors.length, report: 'target/chrome-report.json' }, null, 2));
   assert.equal(report.layouts, 2688, 'The complete text corpus must execute');
   assert.equal(report.cards, 192);
+  assert.equal(report.authors.headers, 648);
+  assert.equal(report.authors.mismatches.length, 0, 'Author-header regressions; inspect target/chrome-report.json');
   const differences = [...report.mismatches.map(item => ['text', item]), ...report.cardMismatches.map(item => ['card', item])];
   const fingerprints = differences.map(([kind, item]) => `${kind}/${item.key}:${createHash('sha256').update(JSON.stringify(item)).digest('hex')}`);
   const baselinePath = join(root, 'tests/fixtures/chrome-known-differences.json');
@@ -70,7 +72,7 @@ try {
   const known = new Set(JSON.parse(await readFile(baselinePath, 'utf8')));
   const regressions = fingerprints.filter(key => !known.has(key));
   assert.deepEqual(regressions, [], 'New Chrome differences; inspect target/chrome-report.json');
-  if (process.argv.includes('--strict')) assert.equal(differences.length, 0, 'Chrome parity still has known differences');
+  if (process.argv.includes('--strict')) assert.equal(differences.length + report.widthErrors.length + report.authors.widthErrors.length, 0, 'Chrome parity still has known differences');
 } finally {
   clearTimeout(timeout);
   chrome.kill();

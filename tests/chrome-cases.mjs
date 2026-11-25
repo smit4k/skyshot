@@ -1,5 +1,16 @@
 export const widths = [96, 120, 160, 200, 248, 280, 320, 358, 390, 480, 568, 600, 768, 968];
 export const sizes = [13.1, 15, 16.9];
+export const authorCases = [
+  { name: 'unverified', verification: null },
+  { name: 'invalid', verification: { verifiedStatus: 'invalid', trustedVerifierStatus: 'invalid' } },
+  { name: 'unknown', verification: { verifiedStatus: 'unknown' } },
+  { name: 'verified', verification: { verifiedStatus: 'valid' } },
+  { name: 'verifier', verification: { trustedVerifierStatus: 'valid' } },
+  { name: 'both', verification: { verifiedStatus: 'valid', trustedVerifierStatus: 'valid' } },
+  { name: 'long', displayName: 'A very long verified display name '.repeat(20), verification: { verifiedStatus: 'valid' } },
+  { name: 'no-name', displayName: '', verification: { verifiedStatus: 'valid' } },
+  { name: 'blank-name', displayName: '  ', verification: { verifiedStatus: 'valid' } },
+];
 export const cases = [
   'Hello, Bluesky! This is a simple post with a few links.',
   'Read https://bsky.app and https://example.com/a/long/path?query=value#section today.',

@@ -82,6 +82,86 @@ fn follow_button_uses_theme_colors_at_both_widths() {
 }
 
 #[test]
+fn verification_badges_render_in_every_author_header() {
+    let mut renderer = Renderer::new().unwrap();
+    for context in ["selected", "quote", "ancestor"] {
+        for (status, visible) in [
+            (json!(null), false),
+            (json!({"verifiedStatus":"invalid"}), false),
+            (json!({"verifiedStatus":"valid"}), true),
+            (json!({"trustedVerifierStatus":"valid"}), true),
+        ] {
+            for name in ["Marisa Kabas", "", &"Long name ".repeat(60)] {
+                let mut post = post();
+                post["record"]["text"] = json!("Plain text");
+                post["record"]["facets"] = json!([]);
+                post["author"]["verification"] = json!(null);
+                let mut author = post["author"].clone();
+                author["displayName"] = json!(name);
+                author["verification"] = status.clone();
+                let input = match context {
+                    "quote" => {
+                        post["embed"] = json!({
+                            "$type":"app.bsky.embed.record#view",
+                            "record": {
+                                "$type":"app.bsky.embed.record#viewRecord",
+                                "author":author, "value":post["record"],
+                            }
+                        });
+                        post
+                    }
+                    "ancestor" => {
+                        let mut parent = post.clone();
+                        parent["author"] = author;
+                        json!({"thread": {
+                            "$type":"app.bsky.feed.defs#threadViewPost", "post":post,
+                            "parent":{"$type":"app.bsky.feed.defs#threadViewPost", "post":parent}
+                        }})
+                    }
+                    _ => {
+                        post["author"] = author;
+                        post
+                    }
+                };
+                let input = RenderInput::from_json(&input.to_string()).unwrap();
+                for width in [280, 390, 600] {
+                    for theme in [Theme::Light, Theme::Dim, Theme::Dark] {
+                        let output = renderer
+                            .render(
+                                &input,
+                                RenderOptions {
+                                    width,
+                                    theme,
+                                    scale: 1,
+                                    ancestors: 1,
+                                    ..RenderOptions::default()
+                                },
+                                &BTreeMap::new(),
+                            )
+                            .unwrap();
+                        let png = image::load_from_memory(&output.png).unwrap().to_rgba8();
+                        let blue = png
+                            .enumerate_pixels()
+                            .filter(|(_, _, pixel)| pixel.0 == [0x00, 0x6a, 0xff, 0xff])
+                            .map(|(x, y, _)| (x, y))
+                            .collect::<Vec<_>>();
+                        assert_eq!(
+                            !blue.is_empty(),
+                            visible,
+                            "{context}, {status}, {width}, {theme:?}, {name}"
+                        );
+                        assert!(
+                            blue.iter().all(|(x, _)| *x < width - 16),
+                            "badge must stay inside its header"
+                        );
+                    }
+                }
+            }
+        }
+    }
+}
+
+#[test]
 fn blocked_and_sensitive_content_never_request_assets() {
     let mut post = post();
     post["embed"] = json!({"$type":"app.bsky.embed.images#view","images":[{"thumb":PHOTO}]});

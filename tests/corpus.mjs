@@ -1,4 +1,5 @@
 import { readFile } from 'node:fs/promises';
+import { authorCases } from './chrome-cases.mjs';
 
 const fixture = name => readFile(new URL(`./fixtures/${name}`, import.meta.url));
 const demo = JSON.parse(await fixture('post.json'));
@@ -49,6 +50,15 @@ const examples = Object.entries({
   unavailable: {thread: typed('app.bsky.feed.defs#blockedPost')},
   ancestors: { thread: {...thread(demo), parent: {...thread(demo), parent: typed('app.bsky.feed.defs#notFoundPost') }} },
 });
+for (const { name, ...fields } of authorCases) {
+  const author = { ...demo.author, ...fields };
+  const post = { ...demo, author };
+  examples.push(
+    [`author-${name}`, post],
+    [`quote-author-${name}`, { ...demo, embed: { ...quote, record: { ...quote.record, author } } }],
+    [`ancestor-author-${name}`, { thread: { ...thread(demo), parent: thread(post) } }],
+  );
+}
 
 export { demo, tile, files, thread, examples, external };
 
