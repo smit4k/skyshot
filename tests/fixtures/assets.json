@@ -1,5 +1,19 @@
 {
   "https://cdn.bsky.app/img/avatar/plain/demo": "avatar.jpg",
   "https://cdn.bsky.app/img/feed_thumbnail/plain/demo": "tiles.png",
-  "https://video.bsky.app/watch/example/thumbnail.jpg": "tiles.png"
+  "https://video.bsky.app/watch/example/thumbnail.jpg": "tiles.png",
+  "https://cdn.bsky.app/img/avatar/plain/did:plc:z2dxz4qxqnye24swc7g3lgz3/bafkreigidx5zyw5lhqtiaw5amaob7xuymbiwq4jspiw54lukjvyvdyikqy": "profile-media/nasso.dev-avatar.webp",
+  "https://cdn.bsky.app/img/banner/plain/did:plc:z2dxz4qxqnye24swc7g3lgz3/bafkreidrl4jak7vrnlpkq7mq6g7swl3g4q6q7pxx43bncx3ubftfpaak7a": "profile-media/nasso.dev-banner.webp",
+  "https://cdn.bsky.app/img/avatar/plain/did:plc:z2dxz4qxqnye24swc7g3lgz3/bafkreicfq3ea5zqhn5odc4y5glssxgcmivewooahna3bthvpx2adnsdk64": "profile-media/nasso.dev-icon0.webp",
+  "https://cdn.bsky.app/img/avatar/plain/did:plc:wshs7t2adsemcrrd4snkeqli/bafkreif6z53z4ukqmdgwstspwh5asmhxheblcd2adisoccl4fflozc3kva": "profile-media/tangled.org-avatar.webp",
+  "https://cdn.bsky.app/img/banner/plain/did:plc:wshs7t2adsemcrrd4snkeqli/bafkreiclqwtogwvkixe7nacry7diij232uvq6shfhd4n3yqaqw4dk65e2q": "profile-media/tangled.org-banner.webp",
+  "https://cdn.bsky.app/img/avatar/plain/did:plc:wshs7t2adsemcrrd4snkeqli/bafkreicfq3ea5zqhn5odc4y5glssxgcmivewooahna3bthvpx2adnsdk64": "profile-media/tangled.org-icon0.webp",
+  "https://cdn.bsky.app/img/avatar/plain/did:plc:wshs7t2adsemcrrd4snkeqli/bafkreid7qbwkukmnehooi4kj42ffhntjupfw2slipczdzkybdb2kmkqcqy": "profile-media/tangled.org-icon1.webp",
+  "https://cdn.bsky.app/img/avatar/plain/did:plc:hwevmowznbiukdf6uk5dwrrq/bafkreier2acenrlgmvd6524oteynmqf67gumgu6pacv3lrppgvaupi5nhy": "profile-media/anirudh.fi-avatar.webp",
+  "https://cdn.bsky.app/img/avatar/plain/did:plc:qfpnj4og54vl56wngdriaxug/bafkreihcpwv6ezsmj4jwe237d65k3krsdtokcp4etwu7r7vtkzjnunhh6e": "profile-media/oppi.li-avatar.webp",
+  "https://cdn.bsky.app/img/avatar/plain/did:plc:xasnlahkri4ewmbuzly2rlc5/bafkreibsy6uyrg3zlx6rlxqaopo6unjvam65di5roscbyjifl3kip7xh2a": "profile-media/boltless.me-avatar.webp",
+  "https://cdn.bsky.app/img/banner/plain/did:plc:hwevmowznbiukdf6uk5dwrrq/bafkreici65hsifuqcyk54ni3nokqq27zbfsbw4oj73wm7phmlgn735nh4u": "profile-media/anirudh.fi-banner.webp",
+  "https://cdn.bsky.app/img/avatar/plain/did:plc:hwevmowznbiukdf6uk5dwrrq/bafkreigpvcow64olqjufgggafse5llufss6ms65ksdtwoq5xruksc5ktsy": "profile-media/anirudh.fi-icon0.webp",
+  "https://cdn.bsky.app/img/avatar/plain/did:plc:hwevmowznbiukdf6uk5dwrrq/bafkreifsg36d7r2gjhhxirertefnajaypzi7ogp63jg3gryhzkxqxivncq": "profile-media/anirudh.fi-icon1.webp",
+  "https://cdn.bsky.app/img/avatar/plain/did:plc:zviscnpwyvj6y32agi5davn5/bafkreigjajhjyq2p6uoux62m4roorcop2lr34gyb5z4nlorb5sm66x6ggu": "profile-media/isaaccorbrey.com-avatar.webp"
 }

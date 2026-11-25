@@ -8,10 +8,13 @@ use std::{
     time::Duration,
 };
 
-use clap::{Parser, Subcommand, ValueEnum};
+use clap::{Args, Parser, Subcommand, ValueEnum};
 use reqwest::{Url, blocking::Client, redirect::Policy};
 use serde::Deserialize;
-use skyshot::{RenderInput, RenderOptions, Renderer, Theme, post_lookup, trusted_media_url};
+use skyshot::{
+    ProfileInput, ProfileLayout, ProfileRenderOptions, RenderInput, RenderOptions, RenderResult,
+    Renderer, Theme, post_lookup, profile_url, trusted_media_url,
+};
 
 const MAX_JSON: usize = 2 * 1024 * 1024;
 const MAX_IMAGE: usize = 8 * 1024 * 1024;
@@ -30,27 +33,83 @@ struct Cli {
 enum Command {
     /// Render a public Bluesky post URL, AT URI, JSON file, or JSON on stdin (-).
     Render {
-        input: String,
+        #[command(flatten)]
+        common: RenderArgs,
         #[arg(short, long, default_value = "post.png")]
         output: PathBuf,
-        #[arg(long, default_value_t = 600)]
-        width: u32,
-        #[arg(long, default_value_t = 2)]
-        scale: u32,
-        #[arg(long, value_enum, default_value_t = Mode::Light)]
-        theme: Mode,
         #[arg(long, default_value_t = 0)]
         ancestors: usize,
         /// IANA time zone for the timestamp. Defaults to the system time zone.
         #[arg(long)]
         time_zone: Option<chrono_tz::Tz>,
-        /// JSON object mapping asset URLs to local files relative to the manifest.
-        #[arg(long)]
-        assets: Option<PathBuf>,
-        /// Directory of fallback fonts. Defaults to SKYSHOT_FONTS or fonts/fallback.
-        #[arg(long)]
-        fonts: Option<PathBuf>,
     },
+    /// Render a public Bluesky profile URL, profile AT URI, JSON file, or stdin (-).
+    RenderProfile {
+        #[command(flatten)]
+        common: RenderArgs,
+        #[arg(short, long, default_value = "profile.png")]
+        output: PathBuf,
+        #[arg(long, default_value = "auto", value_parser = ["auto", "mobile", "desktop"])]
+        layout: String,
+        /// JSON file containing caller-supplied viewer context.
+        #[arg(long)]
+        context: Option<PathBuf>,
+    },
+}
+
+#[derive(Args)]
+struct RenderArgs {
+    input: String,
+    #[arg(long, default_value_t = 600, value_parser = clap::value_parser!(u32).range(280..=1000))]
+    width: u32,
+    #[arg(long, default_value_t = 2, value_parser = clap::value_parser!(u32).range(1..=3))]
+    scale: u32,
+    #[arg(long, value_enum, default_value_t = Mode::Light)]
+    theme: Mode,
+    /// JSON object mapping asset URLs to local files relative to the manifest.
+    #[arg(long)]
+    assets: Option<PathBuf>,
+    /// Directory of fallback fonts. Defaults to SKYSHOT_FONTS or fonts/fallback.
+    #[arg(long)]
+    fonts: Option<PathBuf>,
+}
+
+impl RenderArgs {
+    fn client(&self) -> Result<Option<Client>> {
+        if !(self.input.starts_with("https://") || self.input.starts_with("at://")) {
+            return Ok(None);
+        }
+        Ok(Some(
+            Client::builder()
+                .redirect(Policy::none())
+                .connect_timeout(Duration::from_secs(4))
+                .timeout(Duration::from_secs(8))
+                .user_agent(concat!("skyshot/", env!("CARGO_PKG_VERSION")))
+                .build()?,
+        ))
+    }
+
+    fn read_input(&self) -> Result<Vec<u8>> {
+        if self.input == "-" {
+            read_limit(io::stdin().lock(), MAX_JSON)
+        } else {
+            read_limit(File::open(&self.input)?, MAX_JSON)
+        }
+    }
+
+    fn renderer(&self) -> Result<Renderer> {
+        let explicit = self
+            .fonts
+            .clone()
+            .or_else(|| std::env::var_os("SKYSHOT_FONTS").map(PathBuf::from));
+        let directory = explicit
+            .as_deref()
+            .unwrap_or_else(|| Path::new("fonts/fallback"));
+        Ok(Renderer::with_fonts(load_fonts(
+            directory,
+            explicit.is_none(),
+        )?)?)
+    }
 }
 
 #[derive(Clone, Copy, ValueEnum)]
@@ -77,78 +136,180 @@ fn main() {
 }
 
 fn run() -> Result<()> {
-    let Command::Render {
-        input,
-        output,
-        width,
-        scale,
-        theme,
-        ancestors,
-        time_zone,
-        assets,
-        fonts,
-    } = Cli::parse().command;
-    let options = RenderOptions {
-        width,
-        scale,
-        theme: theme.into(),
-        ancestors,
-        time_zone: time_zone.unwrap_or_else(local_time_zone),
-        ..RenderOptions::default()
-    };
-    if ancestors > 3 || !(280..=1000).contains(&width) || !(1..=3).contains(&scale) {
-        return Err("width must be 280–1000, scale 1–3, and ancestors 0–3".into());
+    match Cli::parse().command {
+        Command::Render {
+            common,
+            output,
+            ancestors,
+            time_zone,
+        } => {
+            if ancestors > 3 {
+                return Err("width must be 280–1000, scale 1–3, and ancestors 0–3".into());
+            }
+            let options = RenderOptions {
+                width: common.width,
+                scale: common.scale,
+                theme: common.theme.into(),
+                ancestors,
+                time_zone: time_zone.unwrap_or_else(local_time_zone),
+                ..RenderOptions::default()
+            };
+            let client = common.client()?;
+            let bytes = match &client {
+                Some(client) => resolve(client, &common.input, ancestors)?,
+                None => common.read_input()?,
+            };
+            let post = RenderInput::from_json(std::str::from_utf8(&bytes)?)?;
+            let images = collect_assets(
+                post.asset_urls(options)?,
+                common.assets.as_deref(),
+                client.as_ref(),
+                1,
+            )?;
+            write_result(common.renderer()?.render(&post, options, &images)?, &output)
+        }
+        Command::RenderProfile {
+            common,
+            output,
+            layout,
+            context,
+        } => {
+            let options = ProfileRenderOptions {
+                width: common.width,
+                scale: common.scale,
+                theme: common.theme.into(),
+                layout: match layout.as_str() {
+                    "mobile" => ProfileLayout::Mobile,
+                    "desktop" => ProfileLayout::Desktop,
+                    _ => ProfileLayout::Auto,
+                },
+            };
+            let client = common.client()?;
+            let bytes = match &client {
+                Some(client) => fetch(client, profile_url(&common.input)?, MAX_JSON)?,
+                None => common.read_input()?,
+            };
+            let mut input = parse_profile_input(&bytes, context.as_deref(), client.as_ref())?;
+            if let Some(client) = &client {
+                let profiles = input
+                    .bio_mention_requests()
+                    .into_iter()
+                    .filter_map(|url| fetch(client, url, MAX_JSON).ok())
+                    .filter_map(|bytes| serde_json::from_slice::<serde_json::Value>(&bytes).ok())
+                    .filter_map(|mut value| value["profiles"].take().as_array().cloned())
+                    .flatten()
+                    .collect::<Vec<_>>();
+                input.resolve_bio_mentions(&profiles);
+            }
+            let mut renderer = common.renderer()?;
+            let urls = renderer.profile_asset_urls(&input, options)?;
+            let images = collect_assets(urls, common.assets.as_deref(), client.as_ref(), 4)?;
+            write_result(renderer.render_profile(&input, options, &images)?, &output)
+        }
     }
-    let remote = input.starts_with("https://") || input.starts_with("at://");
-    let client = remote
-        .then(|| {
-            Client::builder()
-                .redirect(Policy::none())
-                .connect_timeout(Duration::from_secs(4))
-                .timeout(Duration::from_secs(8))
-                .user_agent(concat!("skyshot/", env!("CARGO_PKG_VERSION")))
-                .build()
-        })
-        .transpose()?;
-    let bytes = if let Some(client) = &client {
-        resolve(client, &input, ancestors)?
-    } else if input == "-" {
-        read_limit(io::stdin().lock(), MAX_JSON)?
-    } else {
-        read_limit(File::open(input)?, MAX_JSON)?
-    };
-    let post = RenderInput::from_json(std::str::from_utf8(&bytes)?)?;
-    let local = assets
-        .as_deref()
-        .map(read_manifest)
-        .transpose()?
-        .unwrap_or_default();
+}
+
+fn parse_profile_input(
+    bytes: &[u8],
+    context: Option<&Path>,
+    client: Option<&Client>,
+) -> Result<ProfileInput> {
+    use serde_json::{Value, json};
+    let mut envelope: Value = serde_json::from_slice(bytes)?;
+    if envelope.get("profile").is_none() {
+        envelope = json!({ "profile": envelope });
+    }
+    if let Some(path) = context {
+        envelope["context"] = serde_json::from_slice(&read_limit(File::open(path)?, MAX_JSON)?)?;
+    }
+    if client.is_some() {
+        if envelope["context"].is_null() {
+            envelope["context"] = json!({});
+        }
+        let context = envelope["context"]
+            .as_object_mut()
+            .ok_or("profile context must be an object")?;
+        if context.get("snapshotAt").is_none_or(Value::is_null) {
+            let now: chrono::DateTime<chrono::Utc> = std::time::SystemTime::now().into();
+            context.insert("snapshotAt".into(), json!(now.to_rfc3339()));
+        }
+    }
+    let input = ProfileInput::from_json(&envelope.to_string())?;
+    if let (Some(client), Some(url)) = (client, input.labeler_request()) {
+        let mut response: Value = serde_json::from_slice(&fetch(client, url, MAX_JSON)?)?;
+        envelope["labeler"] = response["views"]
+            .get_mut(0)
+            .ok_or("Bluesky returned no labeler details")?
+            .take();
+        return Ok(ProfileInput::from_json(&envelope.to_string())?);
+    }
+    Ok(input)
+}
+
+fn collect_assets(
+    urls: Vec<String>,
+    manifest: Option<&Path>,
+    client: Option<&Client>,
+    concurrency: usize,
+) -> Result<BTreeMap<String, Vec<u8>>> {
+    let local = manifest.map(read_manifest).transpose()?.unwrap_or_default();
     let mut images = BTreeMap::new();
     let mut left = ASSET_BUDGET;
-    for url in post.asset_urls(options)? {
+    let mut urls = urls.into_iter();
+    while left > 0 {
         let limit = left.min(MAX_IMAGE);
-        if limit == 0 {
+        let count = concurrency.min((left / MAX_IMAGE).max(1));
+        let batch: Vec<_> = urls.by_ref().take(count).collect();
+        if batch.is_empty() {
             break;
         }
-        let bytes = if let Some(path) = local.get(&url) {
-            read_limit(File::open(path)?, limit)?
-        } else if let Some((client, approved)) = client.as_ref().zip(trusted_media_url(&url)) {
-            let Ok(bytes) = fetch(client, approved, limit) else {
-                continue;
-            };
-            bytes
-        } else {
-            continue;
+        let load = |url: &String| -> Result<Option<Vec<u8>>> {
+            if let Some(path) = local.get(url) {
+                Ok(Some(read_limit(File::open(path)?, limit)?))
+            } else if let Some((client, approved)) = client.zip(trusted_media_url(url)) {
+                Ok(fetch(client, approved, limit).ok())
+            } else {
+                Ok(None)
+            }
         };
-        left -= bytes.len();
-        images.insert(url, bytes);
+        // Only optional network reads are concurrent. Keep local filesystem errors on the CLI thread.
+        let mut results: Vec<_> = batch
+            .iter()
+            .map(|url| local.contains_key(url).then(|| load(url)))
+            .collect();
+        if count > 1 && client.is_some() {
+            std::thread::scope(|scope| {
+                let pending: Vec<_> = batch
+                    .iter()
+                    .enumerate()
+                    .filter(|(i, _)| results[*i].is_none())
+                    .map(|(i, url)| (i, scope.spawn(move || load(url).ok().flatten())))
+                    .collect();
+                for (i, thread) in pending {
+                    results[i] = Some(
+                        thread
+                            .join()
+                            .map_err(|_| "asset request failed")
+                            .map_err(Into::into),
+                    );
+                }
+            });
+        }
+        for (url, result) in batch.into_iter().zip(results) {
+            let bytes = match result {
+                Some(result) => result?,
+                None => load(&url)?,
+            };
+            if let Some(bytes) = bytes {
+                left -= bytes.len();
+                images.insert(url, bytes);
+            }
+        }
     }
-    let explicit = fonts.or_else(|| std::env::var_os("SKYSHOT_FONTS").map(PathBuf::from));
-    let directory = explicit
-        .as_deref()
-        .unwrap_or_else(|| Path::new("fonts/fallback"));
-    let fallback = load_fonts(directory, explicit.is_none())?;
-    let rendered = Renderer::with_fonts(fallback)?.render(&post, options, &images)?;
+    Ok(images)
+}
+
+fn write_result(rendered: RenderResult, output: &Path) -> Result<()> {
     for warning in &rendered.warnings {
         eprintln!("skyshot: {}", serde_json::to_string(warning)?);
     }

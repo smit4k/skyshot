@@ -102,6 +102,26 @@ test('worker warms up silently and reports render time for the requested post on
   });
 });
 
+test('worker routes profile links and reuses resolved assets across themes', async () => {
+  const source = await readFile(new URL('site/render-worker.mjs', root), 'utf8');
+  const seen = [];
+  const profile = {};
+  const link = 'https://bsky.app/profile/nasso.dev';
+  const result = () => ({ png: new Uint8Array(1), width: 1, height: 1, warnings: [] });
+  const self = { postMessage(data) { if (data.png) assert.equal(data.kind, 'profile'); } };
+  runInNewContext(source.replace(/^import .*;\n/, ''), {
+    self, performance, fetch: async () => { throw new Error('no warmup assets'); },
+    loadSkyshot: async () => ({
+      render: result,
+      resolveProfile: async url => { assert.equal(url, link); seen.push('resolve'); return profile; },
+      renderProfile: (input, options) => { assert.equal(input, profile); seen.push(options.theme); return result(); },
+    }),
+  });
+  await self.onmessage({ data: { link, kind: 'profile', theme: 'light' } });
+  await self.onmessage({ data: { link, kind: 'profile', theme: 'dark' } });
+  assert.deepEqual(seen, ['resolve', 'light', 'dark']);
+});
+
 test('browser media uses a verified first-party PDS and retains fetch safeguards', async t => {
   const did = 'did:plc:aaaaaaaaaaaaaaaaaaaaaaaa';
   const endpoint = 'https://puffball.us-east.host.bsky.network';

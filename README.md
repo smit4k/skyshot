@@ -1,6 +1,6 @@
 # Skyshot
 
-Skyshot renders a public Bluesky post to PNG. The same Rust renderer runs natively and in WebAssembly. It measures the post and paints it into a pixel buffer using the supplied JSON, image bytes, and fonts.
+Skyshot renders public Bluesky posts and profile headers to PNG. The same Rust renderer runs natively and in WebAssembly using AppView JSON, image bytes, and fonts.
 
 ## CLI
 
@@ -21,6 +21,18 @@ target/release/skyshot render tests/fixtures/post.json \
 
 Options include `--width 280..1000`, `--scale 1..3`, `--theme light|dark|dim`, and `--ancestors 0..3`. Defaults are 600 pixels, 2×, light, and no ancestors. CLI timestamps use the system time zone. Pass `--time-zone America/Detroit` or `--time-zone UTC` to pin it. Date labels use English. `-o -` writes PNG bytes to stdout. Set `SKYSHOT_FONTS` or pass `--fonts` to use a different fallback font directory. Without that directory, the CLI uses the bundled Inter font.
 
+## Profile headers
+
+```sh
+target/release/skyshot render-profile 'https://bsky.app/profile/nasso.dev' --theme dark -o profile.png
+```
+
+The image includes the banner, avatar, profile controls, name, badges, handle, pronouns, counts, biography, link pills, and viewer context through the end of the header. Use `--layout auto|mobile|desktop` to select the web layout. Auto uses desktop at 600 CSS pixels and wider. Profile sizes and themes follow the post defaults.
+
+For offline use, pass AppView `getProfile` JSON or `{profile, context, labeler}` through a file or stdin. Supply media using `--assets`. Use `--context` to replace the context with a JSON file. A snapshot time (`context.snapshotAt`, RFC 3339) is required for offline profiles with live status. It also controls the new-account indicator. Public resolution supplies a snapshot time automatically.
+
+For the signed-in view, supply `profile.viewer` from an authenticated AppView response. Set `context.viewerDid` to identify the viewer and `context.canChat` for settled conversation availability. Other optional context fields cover labeler subscription, beta status, resolved biography facets, and moderation. See the [JavaScript types](packages/skyshot/index.d.ts) for the JSON fields. When present, `labeler` is the corresponding `LabelerViewDetailed`.
+
 ## Rust
 
 Use `default-features = false` for a build without CLI dependencies. The host owns resource loading. Supply Noto font bytes to `Renderer::with_fonts` for emoji and additional scripts.
@@ -37,6 +49,8 @@ fn render(json: &str, assets: &BTreeMap<String, Vec<u8>>) -> Result<Vec<u8>, sky
 ```
 
 Reuse the renderer across posts to retain its font and glyph caches. `input.asset_urls(options)` returns URLs for visible media only. Missing or invalid optional assets produce placeholders and warnings.
+
+For profiles, parse with `ProfileInput::from_json`, discover exact visible assets with `renderer.profile_asset_urls(&profile, options)`, then call `renderer.render_profile(&profile, options, &assets)`. Pass `ProfileRenderOptions` for the width, scale, layout, and theme.
 
 ## JavaScript and WebAssembly
 
@@ -65,7 +79,7 @@ For smaller startup downloads, use `loadSkyshot({ lazy: true })`. `resolve()` au
 
 ## Website
 
-The single-page site is statically generated with Node, with no npm dependencies or server runtime. It uses the browser WebAssembly package in a web worker. Paste a public Bluesky post link to preview and download its PNG. Three theme boxes select Light, Dim, or pure-black Dark; changing the theme regenerates the preview without fetching the post again.
+The single-page site is statically generated with Node, with no npm dependencies or server runtime. It uses the browser WebAssembly package in a web worker. Paste a public Bluesky post or profile link to preview and download its PNG. Changing the theme regenerates the preview with the data and images already downloaded.
 
 After building WebAssembly with the prerequisites above:
 
@@ -76,7 +90,7 @@ python3 -m http.server 4321 --directory dist --bind 127.0.0.1
 
 Open `http://127.0.0.1:4321`. Deploy the contents of `dist/` to any static host; relative asset paths also work under a subdirectory. Serve `.wasm` as `application/wasm`. The page follows the system light or dark theme; the image theme defaults to Light.
 
-The renderer loads in a worker when the page opens and requires a browser with WebAssembly SIMD support. The worker warms the text renderer, then decodes and renders a bundled JPEG and PNG while waiting for the first submission. The site downloads fallback fonts only when the supplied post needs their scripts. An ASCII post needs no fallback download. The current WASM core is about 1.83 MiB gzipped. The complete optional fallback set is still about 51 MiB. Subsequent submissions reuse the worker, loaded fonts, and recently prepared images. Posts are fetched by handle or DID in one request to Bluesky's public API. Visible media downloads run up to four at a time within the existing byte limits. Because the image CDN blocks browser reads, the site resolves PLC identities and fetches image blobs from verified Bluesky-hosted PDS servers. Other media hosts, unavailable blobs, and blocked video thumbnails use the renderer's placeholders with a warning.
+The renderer loads in a worker when the page opens and requires a browser with WebAssembly SIMD support. The worker warms the text renderer, then decodes and renders a bundled JPEG and PNG while waiting for the first submission. The site downloads fallback fonts only when the supplied post needs their scripts. An ASCII post needs no fallback download. The current WASM core is about 2.74 MB gzipped. The complete optional fallback set is still about 51 MiB. Subsequent submissions reuse the worker, loaded fonts, and recently prepared images. Posts are fetched by handle or DID in one request to Bluesky's public API. Visible media downloads run up to four at a time within the existing byte limits. Because the image CDN blocks browser reads, the site resolves PLC identities and fetches image blobs from verified Bluesky-hosted PDS servers. Other media hosts, unavailable blobs, and blocked video thumbnails use the renderer's placeholders with a warning.
 
 ```sh
 npm run test:site

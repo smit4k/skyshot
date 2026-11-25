@@ -1,5 +1,5 @@
 const form = document.querySelector('form');
-const input = document.querySelector('#post-link');
+const input = document.querySelector('#bluesky-link');
 const button = document.querySelector('button');
 const themes = document.querySelector('#themes');
 const status = document.querySelector('#status');
@@ -40,7 +40,9 @@ function startWorker() {
     preview.src = imageUrl;
     preview.width = data.width;
     preview.height = data.height;
+    preview.alt = `Rendered Bluesky ${data.kind}`;
     download.href = imageUrl;
+    download.download = data.kind === 'profile' ? 'skyshot-profile.png' : 'skyshot.png';
     preview.hidden = false;
     download.hidden = false;
     document.querySelector('#placeholder').hidden = true;
@@ -61,10 +63,11 @@ form.addEventListener('submit', event => {
   input.value = link;
   let url;
   try { url = new URL(link); } catch { /* The message below also covers malformed URLs. */ }
+  const kind = /^\/profile\/[^/]+\/?$/.test(url?.pathname) ? 'profile' : 'post';
   if (!url || url.protocol !== 'https:' || url.hostname !== 'bsky.app'
       || url.username || url.password || url.port
-      || !/^\/profile\/[^/]+\/post\/[^/]+\/?$/.test(url.pathname)) {
-    finish('Paste a Bluesky post link, such as https://bsky.app/profile/name.bsky.social/post/…');
+      || (kind === 'post' && !/^\/profile\/[^/]+\/post\/[^/]+\/?$/.test(url.pathname))) {
+    finish('Paste a Bluesky post or profile link, such as https://bsky.app/profile/name.bsky.social');
     input.focus();
     return;
   }
@@ -75,7 +78,7 @@ form.addEventListener('submit', event => {
   status.textContent = 'Loading renderer…';
   try {
     if (!worker) startWorker();
-    worker.postMessage({ link, theme: form.elements.theme.value });
+    worker.postMessage({ link, kind, theme: form.elements.theme.value });
   } catch {
     worker?.terminate();
     worker = undefined;

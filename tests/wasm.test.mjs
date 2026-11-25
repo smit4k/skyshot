@@ -10,6 +10,55 @@ import { bind } from '../packages/skyshot/shared.mjs';
 import { createMediaFetch } from '../packages/skyshot/media-fetch.mjs';
 
 import { demo, tile, files, thread, examples, external, optionsFor } from './corpus.mjs';
+import { profileExamples, profileOptionsFor } from './profile-cases.mjs';
+
+test('native and WASM produce identical PNGs across the frozen profile corpus', async () => {
+  const renderer = await loadSkyshot();
+  if (process.env.SKYSHOT_PARITY_DIR) await mkdir(process.env.SKYSHOT_PARITY_DIR, { recursive: true });
+  const manifest = new URL('./fixtures/assets.json', import.meta.url).pathname;
+  for (const [i, [name, input]] of profileExamples.entries()) {
+    const options = profileOptionsFor(i);
+    const data = input.profile ? input : { profile: input };
+    const rendered = renderer.renderProfile({ ...data, assets: files }, options);
+    assert.deepEqual(rendered.warnings, [], name);
+    const native = execFileSync(process.env.SKYSHOT_CLI ?? './target/release/skyshot', [
+      'render-profile', '-', '--assets', manifest, '--width', options.width, '--scale', options.scale,
+      '--theme', options.theme, '-o', '-',
+    ], { input: JSON.stringify(data), maxBuffer: 32 * 1024 * 1024 });
+    assert.deepEqual(Buffer.from(rendered.png), native, name);
+    if (process.env.SKYSHOT_PARITY_DIR) await writeFile(join(process.env.SKYSHOT_PARITY_DIR, `${name}.png`), rendered.png);
+    assert.deepEqual(renderer.renderProfile({ ...data, assets: files }, options).png, rendered.png, name);
+  }
+});
+
+test('profile resolution uses AppView and visible stored icons without visiting destinations', async () => {
+  const profile = Object.fromEntries(profileExamples)['profile-nasso'].profile;
+  const seen = [];
+  const renderer = await loadSkyshot({ lazy: true, fetch: async (url, options) => {
+    assert.equal(options.redirect, 'error');
+    assert.equal(options.credentials, 'omit');
+    const u = new URL(url);
+    seen.push(u);
+    if (u.pathname.endsWith('.getProfile')) return Response.json(profile);
+    if (u.pathname.endsWith('.getProfiles')) return Response.json({ profiles: [
+      { handle: 'nyaamiou.bsky.social', did: 'did:plc:zjyriem3kwtem426jv3w5tuq' },
+    ] });
+    assert.equal(u.hostname, 'cdn.bsky.app');
+    return new Response(tile);
+  } });
+  const result = await renderer.resolveProfile('https://bsky.app/profile/nasso.dev');
+  assert.deepEqual(seen.map(u => u.hostname), ['public.api.bsky.app', 'public.api.bsky.app', 'cdn.bsky.app', 'cdn.bsky.app', 'cdn.bsky.app']);
+  assert.equal(seen[0].searchParams.get('actor'), 'nasso.dev');
+  assert.equal(seen[1].searchParams.getAll('actors').length, 2);
+  assert.deepEqual([...result.assets.keys()].sort(), [profile.avatar, profile.banner, profile.links[0].icon].sort());
+  assert.match(result.context.snapshotAt, /Z$/);
+  const rendered = renderer.renderProfile(result);
+  assert.deepEqual(rendered.warnings, []);
+  const eager = await loadSkyshot();
+  assert.deepEqual(eager.renderProfile(result).png, rendered.png);
+  result.assets.set(profile.avatar, files.get(profile.avatar));
+  assert.notDeepEqual(renderer.renderProfile(result).png, rendered.png);
+});
 
 test('native and WASM produce identical PNGs across the frozen post corpus', async () => {
   const renderer = await loadSkyshot();

@@ -23,6 +23,7 @@ import { fontNames } from '/packages/skyshot/shared.mjs';
 import { loadSkyshot } from '/packages/skyshot/web.mjs';
 import { cases, widths, sizes } from './chrome-cases.mjs';
 import { checkAuthors } from './chrome-authors.mjs';
+import { checkProfiles } from './chrome-profiles.mjs';
 
 try {
   const demo = await (await fetch('./fixtures/post.json')).json();
@@ -150,7 +151,8 @@ try {
     }
   }
   const authors = await checkAuthors(renderer, plain, sample.style.fontFamily);
+  const profiles = await checkProfiles(renderer);
   renderer.free();
-  globalThis.done({ userAgent: navigator.userAgent, browserPerformance, layouts, mismatches, widthErrors, cards, cardMismatches, authors });
+  globalThis.done({ userAgent: navigator.userAgent, browserPerformance, layouts, mismatches, widthErrors, cards, cardMismatches, authors, profiles });
 } catch (error) { globalThis.fail(String(error.stack ?? error)); }
 </script>

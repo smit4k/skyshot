@@ -8,7 +8,7 @@ import { extname, join, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
-const mime = { '.html': 'text/html', '.mjs': 'text/javascript', '.js': 'text/javascript', '.wasm': 'application/wasm', '.ttf': 'font/ttf' };
+const mime = { '.html': 'text/html', '.mjs': 'text/javascript', '.js': 'text/javascript', '.wasm': 'application/wasm', '.ttf': 'font/ttf', '.png': 'image/png' };
 const server = createServer(async (request, response) => {
   try {
     const path = resolve(root, `.${decodeURIComponent(new URL(request.url, 'http://localhost').pathname)}`);
@@ -60,11 +60,13 @@ try {
   assert.ok(!result.exceptionDetails, JSON.stringify(result.exceptionDetails));
   const report = result.result.value;
   await writeFile(join(root, 'target/chrome-report.json'), JSON.stringify(report, null, 2) + '\n');
-  console.log(JSON.stringify({ chrome: report.userAgent, browserPerformance: report.browserPerformance, layouts: report.layouts, lineBreakMismatches: report.mismatches.length, widthErrorsOver1px: report.widthErrors.length, cards: report.cards, cardMismatches: report.cardMismatches.length, authorHeaders: report.authors.headers, authorMismatches: report.authors.mismatches.length, authorWidthErrorsOver1px: report.authors.widthErrors.length, report: 'target/chrome-report.json' }, null, 2));
+  console.log(JSON.stringify({ chrome: report.userAgent, browserPerformance: report.browserPerformance, layouts: report.layouts, lineBreakMismatches: report.mismatches.length, widthErrorsOver1px: report.widthErrors.length, cards: report.cards, cardMismatches: report.cardMismatches.length, authorHeaders: report.authors.headers, authorMismatches: report.authors.mismatches.length, authorWidthErrorsOver1px: report.authors.widthErrors.length, profileReferences: report.profiles.references, profileIssues: report.profiles.issues.length, report: 'target/chrome-report.json' }, null, 2));
   assert.equal(report.layouts, 2688, 'The complete text corpus must execute');
   assert.equal(report.cards, 192);
   assert.equal(report.authors.headers, 648);
   assert.equal(report.authors.mismatches.length, 0, 'Author-header regressions; inspect target/chrome-report.json');
+  assert.equal(report.profiles.references, 6, 'All captured profile references must execute');
+  assert.deepEqual(report.profiles.issues, [], 'Profile parity regressions');
   const differences = [...report.mismatches.map(item => ['text', item]), ...report.cardMismatches.map(item => ['card', item])];
   const fingerprints = differences.map(([kind, item]) => `${kind}/${item.key}:${createHash('sha256').update(JSON.stringify(item)).digest('hex')}`);
   const baselinePath = join(root, 'tests/fixtures/chrome-known-differences.json');

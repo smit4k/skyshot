@@ -237,6 +237,8 @@ struct SelfLabels {
 pub(crate) struct Label {
     pub val: String,
     #[serde(default)]
+    pub src: String,
+    #[serde(default)]
     pub neg: bool,
 }
 

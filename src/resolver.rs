@@ -98,7 +98,7 @@ pub fn post_lookup(input: &str) -> Result<PostLookup, RenderError> {
     })
 }
 
-fn valid_did(did: &str) -> bool {
+pub(crate) fn valid_did(did: &str) -> bool {
     let Some((method, id)) = did
         .strip_prefix("did:")
         .and_then(|rest| rest.split_once(':'))
@@ -114,7 +114,7 @@ fn valid_did(did: &str) -> bool {
             .all(|b| b.is_ascii_alphanumeric() || b".-_:%".contains(&b))
 }
 
-fn valid_handle(handle: &str) -> bool {
+pub(crate) fn valid_handle(handle: &str) -> bool {
     handle.len() <= 253
         && handle.contains('.')
         && handle.split('.').all(|segment| {
@@ -130,6 +130,56 @@ fn valid_handle(handle: &str) -> bool {
             .rsplit('.')
             .next()
             .is_some_and(|tld| tld.as_bytes()[0].is_ascii_alphabetic())
+}
+
+/// Build a public profile request from a handle, DID, profile URL, or profile-record AT URI.
+pub fn profile_url(input: &str) -> Result<Url, RenderError> {
+    let invalid =
+        || RenderError::Input("expected a handle, DID, bsky.app profile URL, or profile AT URI");
+    if input.len() > 2048 || input.bytes().any(|b| b.is_ascii_control()) {
+        return Err(invalid());
+    }
+    let actor = if let Some(rest) = input.strip_prefix("at://") {
+        rest.strip_suffix("/app.bsky.actor.profile/self")
+            .ok_or_else(invalid)?
+            .to_owned()
+    } else if input.starts_with("https://") {
+        let url = Url::parse(input).map_err(|_| invalid())?;
+        if url.host_str() != Some("bsky.app")
+            || url.port().is_some()
+            || !url.username().is_empty()
+            || url.password().is_some()
+        {
+            return Err(invalid());
+        }
+        let path = url
+            .path()
+            .strip_prefix("/profile/")
+            .ok_or_else(invalid)?
+            .trim_end_matches('/');
+        if path.contains('/') {
+            return Err(invalid());
+        }
+        path.to_owned()
+    } else {
+        input.to_owned()
+    };
+    if !valid_did(&actor) && !valid_handle(&actor) {
+        return Err(invalid());
+    }
+    Ok(request("app.bsky.actor.getProfile", &[("actor", &actor)]))
+}
+
+pub(crate) fn labeler_url(did: &str) -> Url {
+    request(
+        "app.bsky.labeler.getServices",
+        &[("dids", did), ("detailed", "true")],
+    )
+}
+
+pub(crate) fn profiles_url(handles: &[&str]) -> Url {
+    let query: Vec<_> = handles.iter().map(|handle| ("actors", *handle)).collect();
+    request("app.bsky.actor.getProfiles", &query)
 }
 
 /// Permit production Bluesky image and video thumbnail CDNs. Redirects must be disabled by the caller.

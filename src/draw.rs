@@ -26,6 +26,7 @@ pub(crate) struct TextEngine {
     fonts: FontSystem,
     glyphs: SwashCache,
     primary: String,
+    profile_fonts: bool,
     images: ImageCache,
 }
 
@@ -61,7 +62,7 @@ pub(crate) struct TextStyle {
     pub size: f32,
     pub spacing: f32,
     pub color: u32,
-    pub strong: bool,
+    pub weight: u16,
     pub lines: Option<usize>,
 }
 
@@ -108,22 +109,55 @@ impl TextEngine {
             ),
             glyphs: SwashCache::new(),
             primary,
+            profile_fonts: false,
             images: ImageCache::default(),
         })
     }
 
     pub fn measure(&mut self, spans: &[Span], width: f32, style: TextStyle) -> TextBlock {
+        self.measure_with_family(spans, width, style, None)
+    }
+
+    pub(crate) fn measure_profile(
+        &mut self,
+        spans: &[Span],
+        width: f32,
+        style: TextStyle,
+    ) -> TextBlock {
+        let family = match style.size {
+            15.0 => "Skyshot Profile Text",
+            24.3 => "Skyshot Profile Compact",
+            30.0 => "Skyshot Profile Display",
+            _ => return self.measure(spans, width, style),
+        };
+        if !self.profile_fonts {
+            let db = self.fonts.db_mut();
+            for bytes in [
+                include_bytes!("../fonts/ProfileText.ttf").as_slice(),
+                include_bytes!("../fonts/ProfileCompact.ttf").as_slice(),
+                include_bytes!("../fonts/ProfileDisplay.ttf").as_slice(),
+            ] {
+                db.load_font_data(bytes.to_vec());
+            }
+            self.profile_fonts = true;
+        }
+        self.measure_with_family(spans, width, style, Some(family))
+    }
+
+    fn measure_with_family(
+        &mut self,
+        spans: &[Span],
+        width: f32,
+        style: TextStyle,
+        family: Option<&str>,
+    ) -> TextBlock {
         let mut buffer = Buffer::new_empty(Metrics::new(style.size, style.spacing));
         let mut features = FontFeatures::new();
         features.disable(FeatureTag::new(b"calt"));
         let attrs = Attrs::new()
-            .family(Family::Name(&self.primary))
+            .family(Family::Name(family.unwrap_or(&self.primary)))
             .font_features(features)
-            .weight(if style.strong {
-                Weight::SEMIBOLD
-            } else {
-                Weight::NORMAL
-            })
+            .weight(Weight(style.weight))
             .color(text_color(style.color));
         buffer.set_size(Some(width.max(1.0)), None);
         buffer.set_wrap(Wrap::WordOrGlyph);
@@ -160,6 +194,16 @@ impl TextEngine {
     }
 }
 
+impl TextBlock {
+    pub(crate) fn last_line(&self) -> Option<(f32, f32, bool)> {
+        self.buffer
+            .layout_runs()
+            .take_while(|line| line.line_top < self.height)
+            .last()
+            .map(|line| (line.line_w, line.line_y, line.rtl))
+    }
+}
+
 #[cfg(all(feature = "verify", feature = "wasm", target_arch = "wasm32"))]
 impl TextBlock {
     pub(crate) fn report(&self) -> serde_json::Value {
@@ -184,6 +228,21 @@ pub(crate) struct Scene {
     pub items: Vec<Item>,
 }
 
+impl Scene {
+    pub(crate) fn asset_urls(&self) -> Vec<String> {
+        self.items
+            .iter()
+            .filter_map(|item| match item {
+                Item::Image { url, .. } => Some(url),
+                _ => None,
+            })
+            .collect::<BTreeSet<_>>()
+            .into_iter()
+            .cloned()
+            .collect()
+    }
+}
+
 pub(crate) enum Item {
     Text {
         block: TextBlock,
@@ -201,6 +260,19 @@ pub(crate) enum Item {
         radius: f32,
         url: String,
         cover: bool,
+        blur: f32,
+        fallback: Option<(Path, u32)>,
+    },
+    Overlay {
+        rect: Rect,
+        radius: f32,
+        color: u32,
+        alpha: u8,
+    },
+    EmbeddedImage {
+        rect: Rect,
+        radius: f32,
+        bytes: &'static [u8],
     },
     Path {
         path: Path,
@@ -352,23 +424,68 @@ pub(crate) fn paint(
                 radius,
                 url,
                 cover,
+                blur,
+                fallback,
             } => {
-                let Some(bytes) = assets.get(&url) else {
+                let drawn = if let Some(bytes) = assets.get(&url) {
+                    if counted.insert(url.clone()) {
+                        asset_bytes = asset_bytes.saturating_add(bytes.len());
+                    }
+                    if asset_bytes > MAX_ASSETS {
+                        return Err(RenderError::Limit("total image bytes"));
+                    }
+                    let drawn = text.images.draw(
+                        &mut pix,
+                        rect,
+                        radius,
+                        scale,
+                        bytes,
+                        cover,
+                        blur,
+                        fallback.is_some(),
+                    );
+                    if !drawn {
+                        warnings.push(Warning::InvalidAsset(url));
+                    }
+                    drawn
+                } else {
                     warnings.push(Warning::MissingAsset(url));
-                    continue;
+                    false
                 };
-                if counted.insert(url.clone()) {
-                    asset_bytes = asset_bytes.saturating_add(bytes.len());
+                if !drawn && let Some((path, color)) = fallback {
+                    pix.fill_path(
+                        &path,
+                        &paint_color(color),
+                        FillRule::EvenOdd,
+                        transform,
+                        None,
+                    );
                 }
-                if asset_bytes > MAX_ASSETS {
-                    return Err(RenderError::Limit("total image bytes"));
+            }
+            Item::Overlay {
+                rect,
+                radius,
+                color,
+                alpha,
+            } => {
+                if let Some(path) = rounded(rect, radius) {
+                    let mut paint = Paint::default();
+                    paint.set_color_rgba8(
+                        (color >> 16) as u8,
+                        (color >> 8) as u8,
+                        color as u8,
+                        alpha,
+                    );
+                    pix.fill_path(&path, &paint, FillRule::Winding, transform, None);
                 }
-                if !text
-                    .images
-                    .draw(&mut pix, rect, radius, scale, bytes, cover)
-                {
-                    warnings.push(Warning::InvalidAsset(url));
-                }
+            }
+            Item::EmbeddedImage {
+                rect,
+                radius,
+                bytes,
+            } => {
+                text.images
+                    .draw(&mut pix, rect, radius, scale, bytes, true, 0.0, false);
             }
         }
     }
@@ -460,6 +577,8 @@ struct TileSize {
     height: u32,
     radius: f32,
     cover: bool,
+    blur: f32,
+    smooth: bool,
 }
 
 impl TileSize {
@@ -537,6 +656,7 @@ impl ImageCache {
         Some(tile)
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn draw(
         &mut self,
         dst: &mut Pixmap,
@@ -545,6 +665,8 @@ impl ImageCache {
         scale: f32,
         bytes: &[u8],
         cover: bool,
+        blur: f32,
+        smooth: bool,
     ) -> bool {
         let x = (rect.x() * scale).round() as i32;
         let y = (rect.y() * scale).round() as i32;
@@ -553,6 +675,8 @@ impl ImageCache {
             height: ((rect.bottom() * scale).round() as i32 - y).max(1) as u32,
             radius: radius * scale,
             cover,
+            blur: blur * scale,
+            smooth,
         };
         if let Some(tile) = self
             .entries
@@ -650,7 +774,19 @@ fn image_tile(raster: &image::RgbaImage, size: TileSize) -> Option<Pixmap> {
         height: dh,
         radius,
         cover,
+        blur,
+        smooth,
     } = size;
+    let downscaled;
+    let raster =
+        if smooth && dw == dh && raster.width() == raster.height() && raster.width() >= dw * 2 {
+            // Chromium filters large avatar and favicon reductions before sampling at display size.
+            downscaled =
+                image::imageops::resize(raster, dw, dh, image::imageops::FilterType::Triangle);
+            &downscaled
+        } else {
+            raster
+        };
     let (w, h) = raster.dimensions();
     let (sx, sy) = (dw as f32 / w as f32, dh as f32 / h as f32);
     let k = if cover { sx.max(sy) } else { sx.min(sy) };
@@ -676,6 +812,11 @@ fn image_tile(raster: &image::RgbaImage, size: TileSize) -> Option<Pixmap> {
                 ((upper * (256 - y.weight) + lower * y.weight + 32768) >> 16) as u8
             });
         }
+    }
+    if blur > 0.0 {
+        let raster = image::RgbaImage::from_raw(dw, dh, tile.take())?;
+        let blurred = image::imageops::fast_blur(&raster, blur);
+        tile = Pixmap::from_vec(blurred.into_raw(), tiny_skia::IntSize::from_wh(dw, dh)?)?;
     }
     if radius > 0.0
         && let Some(mut mask) = Mask::new(dw, dh)
@@ -725,6 +866,8 @@ mod tests {
             height: 4,
             radius: 0.0,
             cover: false,
+            blur: 0.0,
+            smooth: false,
         };
         let contained = image_tile(&pixels, size).unwrap();
         assert_eq!(&contained.data()[..16], &[0; 16]);
@@ -738,6 +881,7 @@ mod tests {
                 width: 2,
                 height: 2,
                 cover: true,
+                blur: 0.0,
                 ..size
             },
         )
@@ -754,6 +898,8 @@ mod tests {
             height: 20,
             radius: 5.0,
             cover: true,
+            blur: 0.0,
+            smooth: false,
         };
         cache.tile(bytes, size).unwrap();
         let larger = cache.tile(bytes, TileSize { width: 40, ..size }).unwrap();

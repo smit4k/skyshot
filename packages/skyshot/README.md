@@ -1,6 +1,6 @@
 # Skyshot
 
-Render Bluesky posts to PNG in Node or web workers using one WebAssembly renderer.
+Render Bluesky posts and profile headers to PNG in Node or web workers using one WebAssembly renderer.
 
 ```js
 import { loadSkyshot } from 'skyshot';
@@ -11,6 +11,8 @@ const { png, width, height, warnings } = skyshot.render(post, options);
 ```
 
 Pass raw AppView JSON or `{ post, assets }` to render offline. Assets are a `Map<string, Uint8Array>` keyed by the exact URLs from AppView. Default fallback fonts are shipped under the included OFL notices. Pass `{ fonts: [fontBytes] }` to load a custom set.
+
+For profiles, call `await skyshot.resolveProfile('https://bsky.app/profile/nasso.dev', options)` and pass the result to `skyshot.renderProfile(profile, options)`. Resolution downloads only the images visible at the requested width and layout. Theme changes can reuse the result. For offline rendering, pass raw `ProfileViewDetailed` JSON or `{ profile, context, labeler, assets }`. In lazy mode, prepare offline inputs with `await skyshot.prepare(input)`. Use `profile.viewer` and `context` for signed-in states.
 
 Reuse the renderer to retain its caches. Pass `{ lazy: true }` to load fallback fonts on demand. `resolve()` prepares them automatically; for raw JSON, call `await skyshot.prepare(post)` before synchronous `render()`. The default still loads all fonts. An explicit `fonts` array disables automatic font loading.
 

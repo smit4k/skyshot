@@ -1,0 +1,486 @@
+[
+  {
+    "actor": "anirudh.fi",
+    "width": 600,
+    "height": 433,
+    "handleY": 244,
+    "banner": {
+      "x": 0,
+      "y": 0,
+      "w": 600,
+      "h": 150
+    },
+    "avatar": {
+      "x": 10,
+      "y": 104,
+      "w": 94,
+      "h": 94
+    },
+    "name": {
+      "x": 16,
+      "y": 205,
+      "w": 316.656,
+      "h": 35
+    },
+    "pronouns": null,
+    "followers": {
+      "x": 16,
+      "y": 272,
+      "w": 101.531,
+      "h": 20
+    },
+    "bio": {
+      "x": 16,
+      "y": 304,
+      "w": 568,
+      "h": 80
+    },
+    "follow": {
+      "x": 460.672,
+      "y": 162,
+      "w": 86.328,
+      "h": 33,
+      "fill": 1012735
+    },
+    "pills": [
+      {
+        "x": 16,
+        "y": 396,
+        "w": 179.109,
+        "h": 29,
+        "fill": 2240063
+      },
+      {
+        "x": 203.109,
+        "y": 396,
+        "w": 110.844,
+        "h": 29,
+        "fill": 2240063
+      }
+    ],
+    "bioLines": [
+      "Co-founder/CEO of @tangled.org. Bangalorean in Helsinki. Effective altruism, AI,",
+      "distributed systems.",
+      "",
+      "Please email me; I don't look at message requests."
+    ],
+    "pixels": [
+      {
+        "sample": "anirudh.fi-600-banner.png",
+        "x": 110,
+        "y": 10,
+        "w": 128,
+        "h": 72
+      },
+      {
+        "sample": "anirudh.fi-600-avatar.png",
+        "x": 52,
+        "y": 246,
+        "w": 121,
+        "h": 104
+      }
+    ]
+  },
+  {
+    "actor": "anirudh.fi",
+    "width": 390,
+    "height": 446,
+    "handleY": 237,
+    "banner": {
+      "x": 0,
+      "y": 0,
+      "w": 390,
+      "h": 150
+    },
+    "avatar": {
+      "x": 10,
+      "y": 104,
+      "w": 94,
+      "h": 94
+    },
+    "name": {
+      "x": 16,
+      "y": 205,
+      "w": 265.734,
+      "h": 28
+    },
+    "pronouns": null,
+    "followers": {
+      "x": 16,
+      "y": 265,
+      "w": 101.531,
+      "h": 20
+    },
+    "bio": {
+      "x": 16,
+      "y": 297,
+      "w": 358,
+      "h": 100
+    },
+    "follow": {
+      "x": 250.672,
+      "y": 162,
+      "w": 86.328,
+      "h": 33,
+      "fill": 1012735
+    },
+    "pills": [
+      {
+        "x": 16,
+        "y": 409,
+        "w": 179.109,
+        "h": 29,
+        "fill": 2240063
+      },
+      {
+        "x": 203.109,
+        "y": 409,
+        "w": 110.844,
+        "h": 29,
+        "fill": 2240063
+      }
+    ],
+    "bioLines": [
+      "Co-founder/CEO of @tangled.org. Bangalorean in",
+      "Helsinki. Effective altruism, AI, distributed",
+      "systems.",
+      "",
+      "Please email me; I don't look at message requests."
+    ],
+    "pixels": [
+      {
+        "sample": "anirudh.fi-390-banner.png",
+        "x": 110,
+        "y": 10,
+        "w": 128,
+        "h": 72
+      },
+      {
+        "sample": "anirudh.fi-390-avatar.png",
+        "x": 52,
+        "y": 246,
+        "w": 121,
+        "h": 104
+      }
+    ]
+  },
+  {
+    "actor": "nasso.dev",
+    "width": 600,
+    "height": 433,
+    "handleY": 244,
+    "banner": {
+      "x": 0,
+      "y": 0,
+      "w": 600,
+      "h": 150
+    },
+    "avatar": {
+      "x": 10,
+      "y": 104,
+      "w": 94,
+      "h": 94
+    },
+    "name": {
+      "x": 16,
+      "y": 205,
+      "w": 148.734,
+      "h": 35
+    },
+    "pronouns": {
+      "x": 112.625,
+      "y": 244,
+      "w": 127.516,
+      "h": 20
+    },
+    "followers": {
+      "x": 16,
+      "y": 272,
+      "w": 96.484,
+      "h": 20
+    },
+    "bio": {
+      "x": 16,
+      "y": 304,
+      "w": 568,
+      "h": 80
+    },
+    "follow": {
+      "x": 460.672,
+      "y": 162,
+      "w": 86.328,
+      "h": 33,
+      "fill": 1012735
+    },
+    "pills": [
+      {
+        "x": 16,
+        "y": 396,
+        "w": 101.125,
+        "h": 29,
+        "fill": 2240063
+      }
+    ],
+    "bioLines": [
+      "this 25yo french programmer still writes code the old-fashioned way!!!",
+      "",
+      "🪡 suit by @nyaamiou.bsky.social",
+      "🎨 banner by @milkybats.bsky.social"
+    ],
+    "pixels": [
+      {
+        "sample": "nasso.dev-600-banner.png",
+        "x": 110,
+        "y": 10,
+        "w": 128,
+        "h": 72
+      },
+      {
+        "sample": "nasso.dev-600-avatar.png",
+        "x": 52,
+        "y": 246,
+        "w": 121,
+        "h": 104
+      }
+    ]
+  },
+  {
+    "actor": "nasso.dev",
+    "width": 390,
+    "height": 446,
+    "handleY": 237,
+    "banner": {
+      "x": 0,
+      "y": 0,
+      "w": 390,
+      "h": 150
+    },
+    "avatar": {
+      "x": 10,
+      "y": 104,
+      "w": 94,
+      "h": 94
+    },
+    "name": {
+      "x": 16,
+      "y": 205,
+      "w": 123.578,
+      "h": 28
+    },
+    "pronouns": {
+      "x": 112.625,
+      "y": 237,
+      "w": 127.516,
+      "h": 20
+    },
+    "followers": {
+      "x": 16,
+      "y": 265,
+      "w": 96.484,
+      "h": 20
+    },
+    "bio": {
+      "x": 16,
+      "y": 297,
+      "w": 358,
+      "h": 100
+    },
+    "follow": {
+      "x": 250.672,
+      "y": 162,
+      "w": 86.328,
+      "h": 33,
+      "fill": 1012735
+    },
+    "pills": [
+      {
+        "x": 16,
+        "y": 409,
+        "w": 101.125,
+        "h": 29,
+        "fill": 2240063
+      }
+    ],
+    "bioLines": [
+      "this 25yo french programmer still writes code the",
+      "old-fashioned way!!!",
+      "",
+      "🪡 suit by @nyaamiou.bsky.social",
+      "🎨 banner by @milkybats.bsky.social"
+    ],
+    "pixels": [
+      {
+        "sample": "nasso.dev-390-banner.png",
+        "x": 110,
+        "y": 10,
+        "w": 128,
+        "h": 72
+      },
+      {
+        "sample": "nasso.dev-390-avatar.png",
+        "x": 52,
+        "y": 246,
+        "w": 121,
+        "h": 104
+      }
+    ]
+  },
+  {
+    "actor": "tangled.org",
+    "width": 600,
+    "height": 373,
+    "handleY": 244,
+    "banner": {
+      "x": 0,
+      "y": 0,
+      "w": 600,
+      "h": 150
+    },
+    "avatar": {
+      "x": 10,
+      "y": 104,
+      "w": 94,
+      "h": 94
+    },
+    "name": {
+      "x": 16,
+      "y": 205,
+      "w": 141.438,
+      "h": 35
+    },
+    "pronouns": null,
+    "followers": {
+      "x": 16,
+      "y": 272,
+      "w": 98.297,
+      "h": 20
+    },
+    "bio": {
+      "x": 16,
+      "y": 304,
+      "w": 568,
+      "h": 20
+    },
+    "follow": {
+      "x": 460.672,
+      "y": 162,
+      "w": 86.328,
+      "h": 33,
+      "fill": 1012735
+    },
+    "pills": [
+      {
+        "x": 16,
+        "y": 336,
+        "w": 101.125,
+        "h": 29,
+        "fill": 2240063
+      },
+      {
+        "x": 125.125,
+        "y": 336,
+        "w": 99.203,
+        "h": 29,
+        "fill": 2240063
+      }
+    ],
+    "bioLines": [
+      "Your code forge for the next decade."
+    ],
+    "pixels": [
+      {
+        "sample": "tangled.org-600-banner.png",
+        "x": 110,
+        "y": 10,
+        "w": 128,
+        "h": 72
+      },
+      {
+        "sample": "tangled.org-600-avatar.png",
+        "x": 52,
+        "y": 246,
+        "w": 121,
+        "h": 104
+      }
+    ]
+  },
+  {
+    "actor": "tangled.org",
+    "width": 390,
+    "height": 366,
+    "handleY": 237,
+    "banner": {
+      "x": 0,
+      "y": 0,
+      "w": 390,
+      "h": 150
+    },
+    "avatar": {
+      "x": 10,
+      "y": 104,
+      "w": 94,
+      "h": 94
+    },
+    "name": {
+      "x": 16,
+      "y": 205,
+      "w": 121.281,
+      "h": 28
+    },
+    "pronouns": null,
+    "followers": {
+      "x": 16,
+      "y": 265,
+      "w": 98.297,
+      "h": 20
+    },
+    "bio": {
+      "x": 16,
+      "y": 297,
+      "w": 358,
+      "h": 20
+    },
+    "follow": {
+      "x": 250.672,
+      "y": 162,
+      "w": 86.328,
+      "h": 33,
+      "fill": 1012735
+    },
+    "pills": [
+      {
+        "x": 16,
+        "y": 329,
+        "w": 101.125,
+        "h": 29,
+        "fill": 2240063
+      },
+      {
+        "x": 125.125,
+        "y": 329,
+        "w": 99.203,
+        "h": 29,
+        "fill": 2240063
+      }
+    ],
+    "bioLines": [
+      "Your code forge for the next decade."
+    ],
+    "pixels": [
+      {
+        "sample": "tangled.org-390-banner.png",
+        "x": 110,
+        "y": 10,
+        "w": 128,
+        "h": 72
+      },
+      {
+        "sample": "tangled.org-390-avatar.png",
+        "x": 52,
+        "y": 246,
+        "w": 121,
+        "h": 104
+      }
+    ]
+  }
+]

@@ -4,6 +4,7 @@ import { gzipSync } from 'node:zlib';
 import { loadSkyshot } from '../packages/skyshot/node.mjs';
 import { fontNames, fontNamesFor } from '../packages/skyshot/shared.mjs';
 import { examples, files } from '../tests/corpus.mjs';
+import { profileExamples } from '../tests/profile-cases.mjs';
 
 const fixture = JSON.parse(await readFile(new URL('../tests/fixtures/post.json', import.meta.url)));
 const avatar = await readFile(new URL('../tests/fixtures/avatar.jpg', import.meta.url));
@@ -56,5 +57,29 @@ const mediaBatch = { totalMs: performance.now() - batchStart, layouts: layouts.m
   assert.deepEqual(warnings, []);
   return { width, height, renderMs, pngBytes: png.length };
 }) };
+const profileRows = [];
+for (const [name, profile] of profileExamples.slice(0, 3)) {
+  const input = { ...profile, assets: files };
+  const prepareStarted = performance.now();
+  await renderer.prepare(input);
+  if (lazy) for (const name of fontNamesFor(input)) fonts.add(name);
+  const prepareMs = performance.now() - prepareStarted;
+  for (const width of [390, 600]) {
+    const samples = [];
+    let firstMs;
+    let pngBytes;
+    for (let i = 0; i < 68; i++) {
+      const start = performance.now();
+      const result = renderer.renderProfile(input, { width, scale: 2 });
+      const elapsed = performance.now() - start;
+      assert.deepEqual(result.warnings, []);
+      firstMs ??= elapsed;
+      pngBytes = result.png.length;
+      if (i >= 8) samples.push(elapsed);
+    }
+    samples.sort((a, b) => a - b);
+    profileRows.push({ name, width, prepareMs, firstMs, medianMs: samples[30], p95Ms: samples[57], pngBytes });
+  }
+}
 const fontBytes = (await Promise.all([...fonts].map(name => readFile(new URL(`../packages/skyshot/fonts/${name}`, import.meta.url))))).reduce((n, bytes) => n + bytes.length, 0);
-console.log(JSON.stringify({ node: process.version, platform: `${process.platform}/${process.arch}`, lazy, wasmBytes: wasm.length, gzipBytes: compressed, loadMs, fontBytes, samples: 60, warmups: 8, rows, mediaBatch }, null, 2));
+console.log(JSON.stringify({ node: process.version, platform: `${process.platform}/${process.arch}`, lazy, wasmBytes: wasm.length, gzipBytes: compressed, loadMs, fontBytes, samples: 60, warmups: 8, rows, mediaBatch, profileRows }, null, 2));

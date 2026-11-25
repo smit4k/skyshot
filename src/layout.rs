@@ -20,18 +20,18 @@ const MEDIUM: f32 = 15.0;
 const LARGE: f32 = 16.9;
 
 #[derive(Clone, Copy)]
-struct Colors {
-    background: u32,
-    text: u32,
-    muted: u32,
-    border: u32,
-    panel: u32,
-    link: u32,
-    control: u32,
-    follow: u32,
+pub(crate) struct Colors {
+    pub(crate) background: u32,
+    pub(crate) text: u32,
+    pub(crate) muted: u32,
+    pub(crate) border: u32,
+    pub(crate) panel: u32,
+    pub(crate) link: u32,
+    pub(crate) control: u32,
+    pub(crate) follow: u32,
 }
 impl Colors {
-    fn from_theme(theme: Theme) -> Self {
+    pub(crate) fn from_theme(theme: Theme) -> Self {
         let [background, text, muted, border, panel, link] = match theme {
             Theme::Light => [0xffffff, 0x000000, 0x405168, 0xdce2ea, 0xf9fafb, 0x006aff],
             Theme::Dark => [0x000000, 0xffffff, 0xa5b2c5, 0x232e3e, 0x111822, 0x4291ff],
@@ -108,13 +108,13 @@ pub(crate) fn post(
     }
 }
 
-struct Layout<'a> {
-    text: &'a mut TextEngine,
-    colors: Colors,
-    time_zone: chrono_tz::Tz,
-    hour12: bool,
-    items: Vec<Item>,
-    warnings: &'a mut Vec<Warning>,
+pub(crate) struct Layout<'a> {
+    pub(crate) text: &'a mut TextEngine,
+    pub(crate) colors: Colors,
+    pub(crate) time_zone: chrono_tz::Tz,
+    pub(crate) hour12: bool,
+    pub(crate) items: Vec<Item>,
+    pub(crate) warnings: &'a mut Vec<Warning>,
 }
 
 impl Layout<'_> {
@@ -171,7 +171,7 @@ impl Layout<'_> {
                 size: SMALL,
                 spacing: 17.0,
                 color: text,
-                strong: false,
+                weight: 400,
                 lines: Some(1),
             },
         );
@@ -237,7 +237,7 @@ impl Layout<'_> {
                     size: MEDIUM,
                     spacing: 20.0,
                     color: self.colors.muted,
-                    strong: false,
+                    weight: 400,
                     lines: Some(1),
                 };
                 let number = self.text.measure(
@@ -245,7 +245,7 @@ impl Layout<'_> {
                     w,
                     TextStyle {
                         color: self.colors.text,
-                        strong: true,
+                        weight: 600,
                         ..style
                     },
                 );
@@ -326,7 +326,7 @@ impl Layout<'_> {
                         size,
                         spacing: (size * 1.3).round(),
                         color: self.colors.text,
-                        strong: false,
+                        weight: 400,
                         lines: compact.then_some(10),
                     },
                 )
@@ -607,7 +607,7 @@ impl Layout<'_> {
                                 size: MEDIUM,
                                 spacing: 19.5,
                                 color: self.colors.text,
-                                strong: false,
+                                weight: 400,
                                 lines: Some(6),
                             },
                         )
@@ -813,7 +813,7 @@ impl Layout<'_> {
                 size,
                 spacing,
                 color: self.colors.text,
-                strong: true,
+                weight: 600,
                 lines: Some(1),
             },
         );
@@ -851,14 +851,14 @@ impl Layout<'_> {
                 size: MEDIUM,
                 spacing: 18.0,
                 color: self.colors.muted,
-                strong: false,
+                weight: 400,
                 lines: Some(1),
             },
         )
         .0
     }
 
-    fn notice(&mut self, label: &str, x: f32, y: f32, w: f32) -> f32 {
+    pub(crate) fn notice(&mut self, label: &str, x: f32, y: f32, w: f32) -> f32 {
         let at = self.items.len();
         let h =
             self.label(
@@ -899,11 +899,13 @@ impl Layout<'_> {
                 radius,
                 url: url.to_owned(),
                 cover,
+                blur: 0.0,
+                fallback: None,
             });
         }
     }
 
-    fn rect(
+    pub(crate) fn rect(
         &mut self,
         [x, y, w, h]: [f32; 4],
         radius: f32,
@@ -943,7 +945,7 @@ impl Layout<'_> {
                 size,
                 spacing: (size * 1.3).round(),
                 color,
-                strong: size == LARGE,
+                weight: if size == LARGE { 600 } else { 400 },
                 lines,
             },
         )
@@ -956,7 +958,7 @@ impl Layout<'_> {
         metrics
     }
 
-    fn icon(&mut self, icon: Icon, x: f32, y: f32, size: f32, color: u32) {
+    pub(crate) fn icon(&mut self, icon: Icon, x: f32, y: f32, size: f32, color: u32) {
         let transform = Transform::from_scale(size / 24.0, size / 24.0).post_translate(x, y);
         if let Some(path) = icon.path().and_then(|path| path.transform(transform)) {
             self.items.push(Item::Path { path, color });
@@ -1000,10 +1002,19 @@ fn emoji_only(text: &str) -> bool {
 }
 
 fn spans(record: &Record, link: u32, warnings: &mut Vec<Warning>) -> Vec<Span> {
-    if record.facets.len() > 300 {
+    rich_spans(&record.text, &record.facets, link, warnings)
+}
+
+pub(crate) fn rich_spans(
+    text: &str,
+    source_facets: &[Value],
+    link: u32,
+    warnings: &mut Vec<Warning>,
+) -> Vec<Span> {
+    if source_facets.len() > 300 {
         warnings.push(Warning::InvalidFacet);
     }
-    let mut facets = record.facets.iter().take(300).collect::<Vec<_>>();
+    let mut facets = source_facets.iter().take(300).collect::<Vec<_>>();
     facets.sort_by_key(|facet| facet["index"]["byteStart"].as_u64());
     let mut spans = Vec::new();
     let mut start = 0;
@@ -1012,7 +1023,7 @@ fn spans(record: &Record, link: u32, warnings: &mut Vec<Warning>) -> Vec<Span> {
             .as_u64()
             .zip(facet["index"]["byteEnd"].as_u64())
             .and_then(|(a, b)| Some((a.try_into().ok()?, b.try_into().ok()?)))
-            .filter(|(a, b)| a < b && *a >= start && record.text.get(*a..*b).is_some())
+            .filter(|(a, b)| a < b && *a >= start && text.get(*a..*b).is_some())
         else {
             warnings.push(Warning::InvalidFacet);
             continue;
@@ -1033,9 +1044,9 @@ fn spans(record: &Record, link: u32, warnings: &mut Vec<Warning>) -> Vec<Span> {
             continue;
         };
         if a > start {
-            spans.push((record.text[start..a].to_owned(), None));
+            spans.push((text[start..a].to_owned(), None));
         }
-        let text = &record.text[a..b];
+        let text = &text[a..b];
         let (display, color) = match kind(feature) {
             "app.bsky.richtext.facet#link" => (
                 short_url(text),
@@ -1053,8 +1064,8 @@ fn spans(record: &Record, link: u32, warnings: &mut Vec<Warning>) -> Vec<Span> {
         spans.push((display, color));
         start = b;
     }
-    if start < record.text.len() {
-        spans.push((record.text[start..].to_owned(), None));
+    if start < text.len() {
+        spans.push((text[start..].to_owned(), None));
     }
     spans
 }

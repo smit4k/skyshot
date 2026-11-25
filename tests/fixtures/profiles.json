@@ -1,0 +1,265 @@
+{
+  "nasso.dev": {
+    "profile": {
+      "did": "did:plc:z2dxz4qxqnye24swc7g3lgz3",
+      "handle": "nasso.dev",
+      "pronouns": "he/him, they/them",
+      "avatar": "https://cdn.bsky.app/img/avatar/plain/did:plc:z2dxz4qxqnye24swc7g3lgz3/bafkreigidx5zyw5lhqtiaw5amaob7xuymbiwq4jspiw54lukjvyvdyikqy",
+      "associated": {
+        "lists": 2,
+        "feedgens": 0,
+        "starterPacks": 0,
+        "labeler": false,
+        "chat": {
+          "allowIncoming": "none",
+          "allowGroupInvites": "none"
+        },
+        "activitySubscription": {
+          "allowSubscriptions": "followers"
+        }
+      },
+      "labels": [],
+      "createdAt": "2023-08-04T21:09:10.670Z",
+      "description": "this 25yo french programmer still writes code the old-fashioned way!!!\n\n🪡 suit by @nyaamiou.bsky.social\n🎨 banner by @milkybats.bsky.social",
+      "banner": "https://cdn.bsky.app/img/banner/plain/did:plc:z2dxz4qxqnye24swc7g3lgz3/bafkreidrl4jak7vrnlpkq7mq6g7swl3g4q6q7pxx43bncx3ubftfpaak7a",
+      "followersCount": 683,
+      "followsCount": 365,
+      "postsCount": 5622,
+      "links": [
+        {
+          "uri": "at://did:plc:z2dxz4qxqnye24swc7g3lgz3/app.bsky.actor.link/3mzm7xpgrrs23",
+          "cid": "bafyreibh665oxinre4rjr456abjo2x5t645ptshwwkdbteqjtgpci5tiji",
+          "url": "https://tangled.org/nasso.dev",
+          "title": "Tangled",
+          "icon": "https://cdn.bsky.app/img/avatar/plain/did:plc:z2dxz4qxqnye24swc7g3lgz3/bafkreicfq3ea5zqhn5odc4y5glssxgcmivewooahna3bthvpx2adnsdk64",
+          "labels": []
+        }
+      ]
+    },
+    "context": {
+      "snapshotAt": "2026-11-25T04:46:22Z",
+      "descriptionFacets": [
+        {
+          "index": {
+            "byteStart": 85,
+            "byteEnd": 106
+          },
+          "features": [
+            {
+              "$type": "app.bsky.richtext.facet#mention",
+              "did": "did:plc:zjyriem3kwtem426jv3w5tuq"
+            }
+          ]
+        },
+        {
+          "index": {
+            "byteStart": 122,
+            "byteEnd": 144
+          },
+          "features": [
+            {
+              "$type": "app.bsky.richtext.facet#mention",
+              "did": "did:plc:ifz7gy5iox3irwl2arz22uxy"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "tangled.org": {
+    "profile": {
+      "did": "did:plc:wshs7t2adsemcrrd4snkeqli",
+      "handle": "tangled.org",
+      "displayName": "Tangled",
+      "avatar": "https://cdn.bsky.app/img/avatar/plain/did:plc:wshs7t2adsemcrrd4snkeqli/bafkreif6z53z4ukqmdgwstspwh5asmhxheblcd2adisoccl4fflozc3kva",
+      "associated": {
+        "lists": 0,
+        "feedgens": 0,
+        "starterPacks": 0,
+        "labeler": false,
+        "chat": {
+          "allowIncoming": "none",
+          "allowGroupInvites": "none"
+        },
+        "activitySubscription": {
+          "allowSubscriptions": "followers"
+        }
+      },
+      "labels": [],
+      "createdAt": "2025-02-10T12:31:23.044Z",
+      "verification": {
+        "verifications": [
+          {
+            "issuer": "did:plc:z72i7hdynmk6r22z27h6tvur",
+            "issuerDisplayName": "Bluesky",
+            "issuerHandle": "bsky.app",
+            "uri": "at://did:plc:z72i7hdynmk6r22z27h6tvur/app.bsky.graph.verification/3mcxxz6bcnt26",
+            "isValid": true,
+            "createdAt": "2026-01-22T00:55:12.696Z"
+          }
+        ],
+        "verifiedStatus": "valid",
+        "trustedVerifierStatus": "none"
+      },
+      "description": "Your code forge for the next decade.",
+      "banner": "https://cdn.bsky.app/img/banner/plain/did:plc:wshs7t2adsemcrrd4snkeqli/bafkreiclqwtogwvkixe7nacry7diij232uvq6shfhd4n3yqaqw4dk65e2q",
+      "followersCount": 44051,
+      "followsCount": 7,
+      "postsCount": 668,
+      "links": [
+        {
+          "uri": "at://did:plc:wshs7t2adsemcrrd4snkeqli/app.bsky.actor.link/3mz46q2rbk22m",
+          "cid": "bafyreib6hu3qnphz72kydrncegjqmu3uxh3l456fanjtdudiukh7ozzg7a",
+          "url": "https://tangled.org/",
+          "title": "Tangled",
+          "icon": "https://cdn.bsky.app/img/avatar/plain/did:plc:wshs7t2adsemcrrd4snkeqli/bafkreicfq3ea5zqhn5odc4y5glssxgcmivewooahna3bthvpx2adnsdk64",
+          "labels": []
+        },
+        {
+          "uri": "at://did:plc:wshs7t2adsemcrrd4snkeqli/app.bsky.actor.link/3mz46q2rbel2k",
+          "cid": "bafyreiaeflsre572m4lqr6nssvl6x2kbgakmnfg57g5fsa7okxu4fo22eq",
+          "url": "https://discord.gg/tangled",
+          "title": "Discord",
+          "icon": "https://cdn.bsky.app/img/avatar/plain/did:plc:wshs7t2adsemcrrd4snkeqli/bafkreid7qbwkukmnehooi4kj42ffhntjupfw2slipczdzkybdb2kmkqcqy",
+          "labels": []
+        }
+      ],
+      "viewer": {
+        "following": "at://did:plc:skyshotviewer/app.bsky.graph.follow/fixture",
+        "knownFollowers": {
+          "count": 5,
+          "followers": [
+            {
+              "did": "did:plc:hwevmowznbiukdf6uk5dwrrq",
+              "handle": "anirudh.fi",
+              "displayName": "Anirudh Oppiliappan",
+              "avatar": "https://cdn.bsky.app/img/avatar/plain/did:plc:hwevmowznbiukdf6uk5dwrrq/bafkreier2acenrlgmvd6524oteynmqf67gumgu6pacv3lrppgvaupi5nhy"
+            },
+            {
+              "did": "did:plc:qfpnj4og54vl56wngdriaxug",
+              "handle": "oppi.li",
+              "displayName": "akshay oppiliappan",
+              "avatar": "https://cdn.bsky.app/img/avatar/plain/did:plc:qfpnj4og54vl56wngdriaxug/bafkreihcpwv6ezsmj4jwe237d65k3krsdtokcp4etwu7r7vtkzjnunhh6e"
+            },
+            {
+              "did": "did:plc:xasnlahkri4ewmbuzly2rlc5",
+              "handle": "boltless.me",
+              "displayName": "boltless",
+              "avatar": "https://cdn.bsky.app/img/avatar/plain/did:plc:xasnlahkri4ewmbuzly2rlc5/bafkreibsy6uyrg3zlx6rlxqaopo6unjvam65di5roscbyjifl3kip7xh2a"
+            }
+          ]
+        }
+      }
+    },
+    "context": {
+      "snapshotAt": "2026-11-25T04:46:22Z",
+      "viewerDid": "did:plc:skyshotviewer",
+      "canChat": false
+    }
+  },
+  "anirudh.fi": {
+    "profile": {
+      "did": "did:plc:hwevmowznbiukdf6uk5dwrrq",
+      "handle": "anirudh.fi",
+      "displayName": "Anirudh Oppiliappan",
+      "avatar": "https://cdn.bsky.app/img/avatar/plain/did:plc:hwevmowznbiukdf6uk5dwrrq/bafkreier2acenrlgmvd6524oteynmqf67gumgu6pacv3lrppgvaupi5nhy",
+      "associated": {
+        "lists": 0,
+        "feedgens": 0,
+        "starterPacks": 0,
+        "labeler": false,
+        "chat": {
+          "allowIncoming": "all",
+          "allowGroupInvites": "all"
+        },
+        "activitySubscription": {
+          "allowSubscriptions": "followers"
+        }
+      },
+      "labels": [],
+      "createdAt": "2025-01-10T13:23:58.344Z",
+      "verification": {
+        "verifications": [
+          {
+            "issuer": "did:plc:z72i7hdynmk6r22z27h6tvur",
+            "issuerDisplayName": "Bluesky",
+            "issuerHandle": "bsky.app",
+            "uri": "at://did:plc:z72i7hdynmk6r22z27h6tvur/app.bsky.graph.verification/3mgvqlk2md72w",
+            "isValid": true,
+            "createdAt": "2026-03-13T01:17:46.120Z"
+          }
+        ],
+        "verifiedStatus": "valid",
+        "trustedVerifierStatus": "none"
+      },
+      "description": "Co-founder/CEO of @tangled.org. Bangalorean in Helsinki. Effective altruism, AI, distributed systems.\n\nPlease email me; I don't look at message requests.",
+      "banner": "https://cdn.bsky.app/img/banner/plain/did:plc:hwevmowznbiukdf6uk5dwrrq/bafkreici65hsifuqcyk54ni3nokqq27zbfsbw4oj73wm7phmlgn735nh4u",
+      "followersCount": 2303,
+      "followsCount": 196,
+      "postsCount": 1915,
+      "links": [
+        {
+          "uri": "at://did:plc:hwevmowznbiukdf6uk5dwrrq/app.bsky.actor.link/3myi6635kvj2o",
+          "cid": "bafyreid7xhd7otmjc2op4smar4r5p65ixlwvymkuf6vooh2g3ano6iu3o4",
+          "url": "https://anirudh.fi/",
+          "title": "Anirudh Oppiliappan",
+          "icon": "https://cdn.bsky.app/img/avatar/plain/did:plc:hwevmowznbiukdf6uk5dwrrq/bafkreigpvcow64olqjufgggafse5llufss6ms65ksdtwoq5xruksc5ktsy",
+          "labels": []
+        },
+        {
+          "uri": "at://did:plc:hwevmowznbiukdf6uk5dwrrq/app.bsky.actor.link/3myi6635kjt2c",
+          "cid": "bafyreigvnzhce7idhelpwurs73fu6dewfuoyk4neylnkmlpinyv4ekylnu",
+          "url": "https://tangled.org/anirudh.fi",
+          "title": "anirudh.fi",
+          "icon": "https://cdn.bsky.app/img/avatar/plain/did:plc:hwevmowznbiukdf6uk5dwrrq/bafkreifsg36d7r2gjhhxirertefnajaypzi7ogp63jg3gryhzkxqxivncq",
+          "labels": []
+        }
+      ],
+      "viewer": {
+        "following": "at://did:plc:skyshotviewer/app.bsky.graph.follow/fixture",
+        "knownFollowers": {
+          "count": 5,
+          "followers": [
+            {
+              "did": "did:plc:wshs7t2adsemcrrd4snkeqli",
+              "handle": "tangled.org",
+              "displayName": "Tangled",
+              "avatar": "https://cdn.bsky.app/img/avatar/plain/did:plc:wshs7t2adsemcrrd4snkeqli/bafkreif6z53z4ukqmdgwstspwh5asmhxheblcd2adisoccl4fflozc3kva"
+            },
+            {
+              "did": "did:plc:zviscnpwyvj6y32agi5davn5",
+              "handle": "isaaccorbrey.com",
+              "displayName": "Isaac Corbrey",
+              "avatar": "https://cdn.bsky.app/img/avatar/plain/did:plc:zviscnpwyvj6y32agi5davn5/bafkreigjajhjyq2p6uoux62m4roorcop2lr34gyb5z4nlorb5sm66x6ggu"
+            },
+            {
+              "did": "did:plc:qfpnj4og54vl56wngdriaxug",
+              "handle": "oppi.li",
+              "displayName": "akshay oppiliappan",
+              "avatar": "https://cdn.bsky.app/img/avatar/plain/did:plc:qfpnj4og54vl56wngdriaxug/bafkreihcpwv6ezsmj4jwe237d65k3krsdtokcp4etwu7r7vtkzjnunhh6e"
+            }
+          ]
+        }
+      }
+    },
+    "context": {
+      "snapshotAt": "2026-11-25T04:46:22Z",
+      "descriptionFacets": [
+        {
+          "index": {
+            "byteStart": 18,
+            "byteEnd": 30
+          },
+          "features": [
+            {
+              "$type": "app.bsky.richtext.facet#mention",
+              "did": "did:plc:wshs7t2adsemcrrd4snkeqli"
+            }
+          ]
+        }
+      ],
+      "viewerDid": "did:plc:skyshotviewer",
+      "canChat": true
+    }
+  }
+}

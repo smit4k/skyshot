@@ -2,7 +2,7 @@
   "name": "skyshot",
   "version": "0.1.0",
   "type": "module",
-  "description": "Browserless Bluesky post to PNG renderer",
+  "description": "Browserless Bluesky post and profile PNG renderer",
   "types": "./index.d.ts",
   "exports": {
     ".": {

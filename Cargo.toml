@@ -3,7 +3,7 @@ name = "skyshot"
 version = "0.1.0"
 edition = "2024"
 rust-version = "1.89"
-description = "Browserless Bluesky post renderer"
+description = "Browserless Bluesky post and profile renderer"
 readme = "README.md"
 
 [lib]

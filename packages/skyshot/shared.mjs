@@ -3,6 +3,7 @@ import * as wasm from './generated/skyshot.js';
 const MAX_JSON = 2 * 1024 * 1024;
 const MAX_IMAGE = 8 * 1024 * 1024;
 const MAX_ASSETS = 32 * 1024 * 1024;
+const json = value => typeof value === 'string' ? value : JSON.stringify(value);
 
 export const fontNames = [
   'NotoColorEmoji.ttf',
@@ -32,7 +33,12 @@ const scriptFonts = [
 
 export function fontNamesFor(input) {
   // shortcut: metadata can request extra fonts; inspect visible text when subsetting packs.
-  const data = input.assets instanceof Map && Object.hasOwn(input, 'post') ? input.post : input;
+  let data = input;
+  if (input?.assets instanceof Map) {
+    data = Object.hasOwn(input, 'post') ? input.post : {
+      profile: input.profile, context: input.context, labeler: input.labeler,
+    };
+  }
   const text = JSON.stringify(typeof data === 'string' ? JSON.parse(data) : data);
   return scriptFonts.filter(([pattern]) => pattern.test(text)).map(([, name]) => name);
 }
@@ -94,8 +100,22 @@ async function getThread(fetch, url) {
   throw new Error(`Bluesky AppView returned HTTP ${status}`);
 }
 
+async function getProfileData(fetch, url) {
+  const { status, bytes } = await request(fetch, url, MAX_JSON);
+  if (status < 200 || status >= 300) throw new Error(`Bluesky AppView returned HTTP ${status}`);
+  return JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes));
+}
+
+function mediaRequests(urls) {
+  return urls.flatMap(raw => {
+    const url = wasm.media_url(raw);
+    return url ? [[raw, url]] : [];
+  });
+}
+
 async function fetchAssets(fetch, urls, assets) {
   let left = MAX_ASSETS;
+  for (const bytes of assets.values()) left -= bytes.length;
   for (let next = 0; next < urls.length && left > 0;) {
     // Reserve a full per-image allowance per active request to stay within the post budget.
     const count = Math.max(1, Math.min(4, Math.floor(left / MAX_IMAGE)));
@@ -127,10 +147,13 @@ export function bind(fonts, fetch, loadFont) {
   const hour12 = Intl.DateTimeFormat(undefined, { hour: 'numeric' }).resolvedOptions().hour12;
   const config = options => ({ timeZone: localTimeZone, hour12, ...options });
   const unpack = result => ({ png: result.png, width: result.width, height: result.height, warnings: result.warnings });
-  function renderInput(input) {
+  function requireFonts(input) {
     if (loadFont && fontNamesFor(input).some(name => !loaded.has(name))) {
       throw new Error('Load fonts with await skyshot.prepare(input) before synchronous rendering');
     }
+  }
+  function renderInput(input) {
+    requireFonts(input);
     const resolved = input.assets instanceof Map && Object.hasOwn(input, 'post');
     const post = resolved ? input.post : input;
     return [typeof post === 'string' ? post : JSON.stringify(post), resolved ? input.assets : new Map()];
@@ -156,13 +179,56 @@ export function bind(fonts, fetch, loadFont) {
         throw new RangeError('ancestors must be an integer from 0 to 3');
       }
       const post = await getThread(fetch, wasm.thread_url(input, undefined, ancestors));
-      const urls = wasm.media_urls(JSON.stringify(post), JSON.stringify(options)).flatMap(raw => {
-        const url = wasm.media_url(raw);
-        return url ? [[raw, url]] : [];
-      });
+      const urls = mediaRequests(wasm.media_urls(JSON.stringify(post), JSON.stringify(options)));
       const resolved = { post, assets: new Map() };
       await Promise.all([fetchAssets(fetch, urls, resolved.assets), prepare(resolved)]);
       return resolved;
+    },
+    async resolveProfile(input, options = {}) {
+      const snapshotAt = new Date().toISOString();
+      const profile = await getProfileData(fetch, wasm.profile_request(input));
+      const resolved = { profile, context: { snapshotAt }, assets: new Map() };
+      const raw = json({ profile, context: resolved.context });
+      const profiles = [];
+      const config = json(options);
+      const primary = mediaRequests(wasm.profile_primary_assets(raw, config));
+      const primaryRequests = new Set(primary.map(([url]) => url));
+      const dependencies = Promise.all(wasm.profile_dependencies(raw).map(async url => {
+        if (new URL(url).pathname.endsWith('.getServices')) {
+          const data = await getProfileData(fetch, url);
+          if (!data.views?.[0]) throw new Error('Bluesky returned no labeler details');
+          resolved.labeler = data.views[0];
+        } else {
+          try {
+            const data = await getProfileData(fetch, url);
+            if (Array.isArray(data.profiles)) profiles.push(...data.profiles.slice(0, 25));
+          } catch {
+            // An unavailable mention remains text.
+          }
+        }
+      }));
+      await Promise.all([
+        dependencies,
+        fetchAssets(fetch, primary, resolved.assets),
+        prepare(resolved),
+      ]);
+      const facets = JSON.parse(wasm.profile_bio_facets(raw, json(profiles)));
+      if (facets) resolved.context.descriptionFacets = facets;
+      if (resolved.labeler) await prepare(resolved);
+      const { assets, ...envelope } = resolved;
+      const urls = mediaRequests(engine.profile_media_urls(json(envelope), config).filter(url => !primaryRequests.has(url)));
+      await fetchAssets(fetch, urls, assets);
+      return resolved;
+    },
+    renderProfile(input, options = {}) {
+      requireFonts(input);
+      const { assets, ...envelope } = typeof input === 'string' ? {} : input;
+      const result = engine.render_profile(json(assets instanceof Map ? envelope : input), json(options), assets instanceof Map ? assets : new Map());
+      try {
+        return unpack(result);
+      } finally {
+        result.free();
+      }
     },
     render(input, options = {}) {
       const [post, assets] = renderInput(input);

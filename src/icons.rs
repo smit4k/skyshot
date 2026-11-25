@@ -61,29 +61,33 @@ impl Icon {
             }
             Self::Gif => return None,
         };
-        let mut path = PathBuilder::new();
-        for segment in SimplifyingPathParser::from(svg) {
-            match segment.ok()? {
-                SimplePathSegment::MoveTo { x, y } => path.move_to(x as f32, y as f32),
-                SimplePathSegment::LineTo { x, y } => path.line_to(x as f32, y as f32),
-                SimplePathSegment::CurveTo {
-                    x1,
-                    y1,
-                    x2,
-                    y2,
-                    x,
-                    y,
-                } => {
-                    path.cubic_to(
-                        x1 as f32, y1 as f32, x2 as f32, y2 as f32, x as f32, y as f32,
-                    );
-                }
-                SimplePathSegment::Quadratic { x1, y1, x, y } => {
-                    path.quad_to(x1 as f32, y1 as f32, x as f32, y as f32);
-                }
-                SimplePathSegment::ClosePath => path.close(),
-            }
-        }
-        path.finish()
+        svg_path(svg)
     }
+}
+
+pub(crate) fn svg_path(svg: &str) -> Option<Path> {
+    let mut path = PathBuilder::new();
+    for segment in SimplifyingPathParser::from(svg) {
+        match segment.ok()? {
+            SimplePathSegment::MoveTo { x, y } => path.move_to(x as f32, y as f32),
+            SimplePathSegment::LineTo { x, y } => path.line_to(x as f32, y as f32),
+            SimplePathSegment::CurveTo {
+                x1,
+                y1,
+                x2,
+                y2,
+                x,
+                y,
+            } => {
+                path.cubic_to(
+                    x1 as f32, y1 as f32, x2 as f32, y2 as f32, x as f32, y as f32,
+                );
+            }
+            SimplePathSegment::Quadratic { x1, y1, x, y } => {
+                path.quad_to(x1 as f32, y1 as f32, x as f32, y as f32);
+            }
+            SimplePathSegment::ClosePath => path.close(),
+        }
+    }
+    path.finish()
 }

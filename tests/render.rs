@@ -15,6 +15,53 @@ fn post() -> Value {
 }
 
 #[test]
+fn profile_resolution_and_moderation_bound_visible_assets() {
+    use skyshot::{ProfileInput, ProfileRenderOptions, profile_url};
+    let mut renderer = Renderer::new().unwrap();
+    let options = ProfileRenderOptions::default();
+    let actor = "did:plc:aaaaaaaaaaaaaaaaaaaaaaaa";
+    let request = profile_url(&format!("at://{actor}/app.bsky.actor.profile/self")).unwrap();
+    assert_eq!(request.path(), "/xrpc/app.bsky.actor.getProfile");
+    assert_eq!(request.query_pairs().next().unwrap().1, actor);
+    for input in [
+        "https://bsky.app/profile/a.test/post/foo",
+        "https://example.org/profile/a.test",
+        "at://a.test/app.bsky.actor.profile/other",
+    ] {
+        assert!(profile_url(input).is_err(), "{input}");
+    }
+    let mut value = json!({
+        "profile": { "did": actor, "handle": "example.com", "avatar": AVATAR, "banner": PHOTO,
+            "description": "A bio with @valid.test", "links": [
+                {"uri":"one", "url":"https://example.com", "icon":"one.png"},
+                {"uri":"two", "url":"https://bit.ly/example", "icon":"two.png"}
+            ] },
+        "context": { "moderation": { "avatar":"hide", "banner":"blur", "links":{"one":"hide"} } }
+    });
+    let input = ProfileInput::from_json(&value.to_string()).unwrap();
+    assert_eq!(
+        renderer.profile_asset_urls(&input, options).unwrap(),
+        [PHOTO]
+    );
+    value["profile"]["labels"] = json!([{"val":"!no-unauthenticated"}]);
+    let input = ProfileInput::from_json(&value.to_string()).unwrap();
+    assert!(
+        renderer
+            .profile_asset_urls(&input, options)
+            .unwrap()
+            .is_empty()
+    );
+    assert!(input.bio_mention_requests().is_empty());
+    value["profile"]["status"] = json!({"status":"app.bsky.actor.status#live"});
+    let input = ProfileInput::from_json(&value.to_string()).unwrap();
+    assert!(
+        renderer
+            .render_profile(&input, options, &BTreeMap::new())
+            .is_err()
+    );
+}
+
+#[test]
 fn malformed_facets_leave_a_renderable_post() {
     let mut post = post();
     post["record"]["facets"]

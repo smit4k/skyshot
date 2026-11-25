@@ -19,3 +19,11 @@ Font sources, versions and SHA-256 hashes are pinned in [fonts/manifest.json](fo
 Current measurements, startup costs and core/font sizes are recorded in [PERFORMANCE.md](PERFORMANCE.md) and reproducible with `npm run bench`. Results depend on the host and whether the renderer's caches are warm.
 
 Development captures measured a public [image post](https://bsky.app/profile/bsky.app/post/3n2m24be4e223) and [portrait video post](https://bsky.app/profile/bsky.app/post/3n2opitxdyc2j) at a width of 390 px. Their Skyshot outputs matched the Chrome crops' outer dimensions (390 × 784 and 390 × 758 respectively). A desktop text reply also matched the reference's body line count, with different word breaks and an added replying-to line.
+
+## Profile headers
+
+The profile image starts at the banner and adds 8 CSS pixels of space below the header. Standard and labeler layouts follow the [pinned Bluesky header source](https://github.com/bluesky-social/social-app/tree/c85e67b62082df8a2b0a45640298f18e8c48ce3d/src/screens/Profile/Header). Public resolution uses `app.bsky.actor.getProfile` directly and requests labeler details for labeler profiles. Bio mention lookups are batched. Supplied viewer context can reproduce Following, Follow back, notification, chat, mutual-follower, self, beta, and labeler states.
+
+Link pills use ordered AppView link views and stored icon URLs. Two rows are visible, with a `+N` pill when links fold. Pinned provider and Germ symbols use the attribution in [LICENSE-Bluesky-icons](packages/skyshot/LICENSE-Bluesky-icons). Asset discovery omits hidden media and folded link icons. Profile text uses optical-size instances derived from the bundled Inter font by [scripts/profile-fonts.py](scripts/profile-fonts.py), under the included OFL.
+
+The Chrome gate uses frozen public views of `nasso.dev`, `tangled.org`, and `anirudh.fi` at 390 and 600 CSS pixels. It checks header geometry within 1 CSS pixel, bio line breaks, exact button and pill fill colors, and sampled banner and avatar regions within 2/255 mean channel error. Signed-in and specialized states use the separate native/WASM corpus. Font fallback and arbitrary bios fall outside the six captures. Supply resolved facets and moderation decisions when reproducing another client's result.

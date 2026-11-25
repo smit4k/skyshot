@@ -34,21 +34,21 @@ ready.then(async skyshot => {
 let resolved;
 let currentLink;
 
-self.onmessage = async ({ data: { link, theme } }) => {
+self.onmessage = async ({ data: { link, theme, kind = 'post' } }) => {
   hasRequest = true;
   try {
     const skyshot = await ready;
     if (link !== currentLink) {
-      self.postMessage({ status: 'Fetching post…' });
-      resolved = await skyshot.resolve(link);
+      self.postMessage({ status: `Fetching ${kind}…` });
+      resolved = kind === 'profile' ? await skyshot.resolveProfile(link) : await skyshot.resolve(link);
       currentLink = link;
     }
     self.postMessage({ status: 'Rendering image…' });
     const started = performance.now();
-    const result = skyshot.render(resolved, { theme });
+    const result = kind === 'profile' ? skyshot.renderProfile(resolved, { theme }) : skyshot.render(resolved, { theme });
     const renderMs = performance.now() - started;
-    self.postMessage({ ...result, renderMs }, [result.png.buffer]);
+    self.postMessage({ ...result, renderMs, kind }, [result.png.buffer]);
   } catch (error) {
-    self.postMessage({ error: `Could not render this post. ${error.message || 'Please try again.'}` });
+    self.postMessage({ error: `Could not render this ${kind}. ${error.message || 'Please try again.'}` });
   }
 };

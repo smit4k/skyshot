@@ -7,7 +7,7 @@ Measurements below are local arm64 macOS results, including PNG encoding, exclud
 | 390 CSS px | 5.71 ms | 1.76 ms |
 | 600 CSS px | 7.90 ms | 2.02 ms |
 
-The PNG encoder uses its existing fast compression with a fixed `Up` filter instead of evaluating five scanline filters. The decoded pixels are unchanged by filtering. The text benchmark PNGs grow about 18–22%. Release builds use thin LTO and one code generation unit. The production WASM is about 5.2 MiB raw and **1.83 MiB gzip**, below the 3 MB compressed budget enforced by `scripts/bench.mjs`.
+The PNG encoder uses its existing fast compression with a fixed `Up` filter instead of evaluating five scanline filters. The decoded pixels are unchanged by filtering. The text benchmark PNGs grow about 18–22%. Release builds use thin LTO and one code generation unit. Before profile support, the production WASM measured about 5.2 MiB raw and **1.83 MiB gzip**. The compressed budget in `scripts/bench.mjs` is 3 MB.
 
 The site opts into lazy fonts. An ASCII post requests **zero fallback packs**. Unicode scripts and emoji trigger concurrent, cached reads of the existing pinned fonts. This conservatively scans all strings in the supplied JSON, so metadata or hidden text can cause extra font downloads. The complete optional set remains about 51 MiB; this change does not subset those fonts. Default package loading stays eager for compatibility. Explicit `fonts` arrays retain their previous behavior.
 
@@ -52,7 +52,7 @@ Set `CHROME` if the executable is elsewhere. The checker uses a temporary headle
 
 The controlled DOM reference uses the pinned [Bluesky detail layout](https://github.com/bluesky-social/social-app/blob/c85e67b62082df8a2b0a45640298f18e8c48ce3d/src/screens/PostThread/components/ThreadItemAnchor.tsx), [word wrapping](https://github.com/bluesky-social/social-app/blob/c85e67b62082df8a2b0a45640298f18e8c48ce3d/src/style.css), [Inter feature settings](https://github.com/bluesky-social/social-app/blob/c85e67b62082df8a2b0a45640298f18e8c48ce3d/src/alf/fonts.ts), and the same pinned font files as the renderer. It measures the production text/layout path; it does not reproduce the complete React app, its system fallback fonts, or browser rasterization.
 
-Current Chrome 158 results:
+Current Chrome 158 post results:
 
 - **2,433 / 2,688 text layouts match visible line breaks.** The corpus includes URLs, whitespace, ligatures, emoji, CJK, Arabic, Hebrew, Devanagari and Thai at 14 widths, three sizes and two weights. Trailing spaces/newlines are normalized for this comparison; their exact hanging-space behavior is not certified.
 - **186 / 192 text-card geometries match.** Eight text cases × four widths × three themes × two scales, checking output dimensions and body position/height. Six failures are one narrow URL case across themes and scales. These are text cards with/without stats, not media or external-link cards. Theme pixels are not checked by this geometry test.
@@ -63,4 +63,12 @@ Current Chrome 158 results:
 
 ## Deterministic PNGs
 
-`tests/wasm.test.mjs` compares 51 frozen post variants byte for byte between native and WASM, including emoji, media grids, galleries, external cards, quote variants, visibility, ancestors and author verification states. Font tests also compare lazy and eager output as scripts are added. CI produces the same corpus on Linux and macOS and compares both with WASM artifacts. Cross-OS CI is configured but was not run locally; do not treat that as an observed cross-OS result.
+`tests/wasm.test.mjs` compares 51 frozen post variants and 17 profile variants byte for byte between native and WASM. Font tests also compare lazy and eager output as scripts are added. CI builds the same corpus on Linux and macOS for comparison with WASM artifacts.
+
+## Profile measurements
+
+On arm64 macOS with Node 22.16, the three frozen profiles with their original media took 2.9–7.1 ms median and 3.2–7.2 ms p95 with warm caches at 390 and 600 CSS pixels, scale 2. These measurements include PNG encoding. First renders for new media took 121–200 ms at 390 pixels, including image decoding and excluding network time. Decode and tile caches share the existing 32 MiB allowance.
+
+The production core is 2.74 MB gzip with the profile renderer and its Inter optical instances. The `npm run bench` post medians changed by −2.1% to +1.4% on the same host. The profile section of the Chrome report passed six captured headers, including sampled raster crops. See [SPEC.md](SPEC.md) for the checked regions and tolerances.
+
+In one live Chrome site check, nasso.dev took about 1.54 s from submission to the first preview, including network requests. Rendering took 86 ms. Switching the theme reused the resolved data and took 10 ms to render.

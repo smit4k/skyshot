@@ -4,6 +4,7 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { examples, optionsFor } from '../tests/corpus.mjs';
+import { profileExamples, profileOptionsFor } from '../tests/profile-cases.mjs';
 
 const root = new URL('../', import.meta.url);
 const output = process.argv[2] ?? 'target/parity-native';
@@ -19,4 +20,12 @@ for (const [i, [name, post]] of examples.entries()) {
   assert.deepEqual([...png.subarray(0, 8)], [137, 80, 78, 71, 13, 10, 26, 10], name);
   await writeFile(join(output, `${name}.png`), png);
 }
-console.log(`Rendered ${examples.length} native parity fixtures into ${output}`);
+for (const [i, [name, input]] of profileExamples.entries()) {
+  const options = profileOptionsFor(i);
+  const png = execFileSync(cli, ['render-profile', '-', '--assets', manifest,
+    '--width', options.width, '--scale', options.scale, '--theme', options.theme, '-o', '-'],
+  { input: JSON.stringify(input), maxBuffer: 32 * 1024 * 1024 });
+  assert.deepEqual([...png.subarray(0, 8)], [137, 80, 78, 71, 13, 10, 26, 10], name);
+  await writeFile(join(output, `${name}.png`), png);
+}
+console.log(`Rendered ${examples.length + profileExamples.length} native parity fixtures into ${output}`);
