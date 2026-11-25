@@ -97,6 +97,7 @@ fieldset:disabled .theme-choice { opacity: 0.65; cursor: wait; }
 figure { margin: 0; }
 img { display: block; width: 100%; height: auto; }
 figcaption { display: flex; justify-content: space-between; gap: 1rem; margin-top: 1rem; font-size: 0.9375rem; }
+figcaption > span { margin-left: auto; }
 
 @media (max-width: 28rem) {
   .input-row { flex-direction: column; }
