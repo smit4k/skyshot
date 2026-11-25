@@ -41,7 +41,8 @@ function startWorker() {
     preview.width = data.width;
     preview.height = data.height;
     download.href = imageUrl;
-    document.querySelector('figure').hidden = false;
+    preview.hidden = false;
+    download.hidden = false;
     document.querySelector('#placeholder').hidden = true;
     status.textContent = `Rendered in ${data.renderMs.toFixed(1)} ms.`;
     if (data.warnings.length) status.textContent += ' Some details could not be rendered.';
