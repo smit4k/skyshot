@@ -129,6 +129,54 @@ fn follow_button_uses_theme_colors_at_both_widths() {
 }
 
 #[test]
+fn external_preview_draws_an_inset_divider_above_the_domain() {
+    let mut post = post();
+    post["embed"] = json!({
+        "$type": "app.bsky.embed.external#view",
+        "external": {
+            "uri": "https://example.com/article",
+            "title": "Example article",
+            "description": "A link preview without a thumbnail"
+        }
+    });
+    let input = RenderInput::from_json(&post.to_string()).unwrap();
+    let mut renderer = Renderer::new().unwrap();
+    let width = 390;
+    let inset = 28;
+    for (theme, border, background) in [
+        (Theme::Light, [0xdc, 0xe2, 0xea, 0xff], [0xff; 4]),
+        (
+            Theme::Dim,
+            [0x2c, 0x3a, 0x4e, 0xff],
+            [0x15, 0x1d, 0x28, 0xff],
+        ),
+        (Theme::Dark, [0x23, 0x2e, 0x3e, 0xff], [0, 0, 0, 0xff]),
+    ] {
+        let output = renderer
+            .render(
+                &input,
+                RenderOptions {
+                    theme,
+                    width,
+                    scale: 1,
+                    ..RenderOptions::default()
+                },
+                &BTreeMap::new(),
+            )
+            .unwrap();
+        let png = image::load_from_memory(&output.png).unwrap().to_rgba8();
+        assert!(
+            (0..png.height()).any(|y| {
+                png.get_pixel(inset - 1, y).0 == background
+                    && png.get_pixel(width - inset, y).0 == background
+                    && (inset..width - inset).all(|x| png.get_pixel(x, y).0 == border)
+            }),
+            "Missing external preview divider in {theme:?}"
+        );
+    }
+}
+
+#[test]
 fn verification_badges_render_in_every_author_header() {
     let mut renderer = Renderer::new().unwrap();
     for context in ["selected", "quote", "ancestor"] {

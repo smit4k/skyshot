@@ -522,14 +522,16 @@ impl Layout<'_> {
             }
             cursor += h;
         }
+        let left = x + 12.0;
+        let inner = w - 24.0;
         cursor += 8.0;
         let title = string(card, "title");
         cursor += self
             .label(
                 if title.is_empty() { uri } else { title },
-                x + 12.0,
+                left,
                 cursor,
-                w - 24.0,
+                inner,
                 MEDIUM,
                 self.colors.text,
                 Some(2),
@@ -541,9 +543,9 @@ impl Layout<'_> {
                 + self
                     .label(
                         description,
-                        x + 12.0,
+                        left,
                         cursor + 2.0,
-                        w - 24.0,
+                        inner,
                         SMALL,
                         self.colors.text,
                         Some(2),
@@ -551,18 +553,25 @@ impl Layout<'_> {
                     .0;
         }
         if !host.is_empty() {
-            cursor += 4.0
-                + self
-                    .label(
-                        &host,
-                        x + 12.0,
-                        cursor + 4.0,
-                        w - 24.0,
-                        SMALL,
-                        self.colors.muted,
-                        Some(1),
-                    )
-                    .0;
+            cursor += 8.0;
+            self.rect(
+                [left, cursor, inner, 1.0],
+                0.0,
+                Some(self.colors.border),
+                None,
+            );
+            cursor += 7.0;
+            cursor += self
+                .label(
+                    &host,
+                    left,
+                    cursor,
+                    inner,
+                    SMALL,
+                    self.colors.muted,
+                    Some(1),
+                )
+                .0;
         }
         cursor += 8.0;
         self.rect([x, y, w, cursor - y], 12.0, None, Some(self.colors.border));
